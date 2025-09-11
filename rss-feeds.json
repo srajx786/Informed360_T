@@ -1,0 +1,12 @@
+{
+  "pinned": [],
+  "feeds": [
+    "https://feeds.bbci.co.uk/news/world/rss.xml",
+    "https://www.aljazeera.com/xml/rss/all.xml",
+    "https://feeds.a.dj.com/rss/RSSWorldNews.xml",
+    "https://www.livemint.com/rss/markets",
+    "https://www.hindustantimes.com/feeds/rss/world-news/rssfeed.xml",
+    "https://www.reuters.com/world/rss"
+  ],
+  "refreshMinutes": 7
+}
