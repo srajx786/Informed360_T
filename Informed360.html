@@ -1,0 +1,35 @@
+<!--
+Informed360 Layout Documentation
+
+This file serves as a source‑of‑truth for the UI/UX of the
+Informed360 news sentiment website. It does not render anything on the
+server, but documents the high‑level design decisions so that both
+designers and developers understand the structure of the site.
+
+Sections:
+  • Top bar: sticky header with the brand on the left and a live
+    market ticker on the right. The ticker displays Sensex (BSE),
+    Nifty (NSE) and NYSE Composite values with price and
+    percentage change (green for positive, red for negative). It
+    updates whenever the /api/ticker endpoint refreshes.
+
+  • Main grid: three columns on desktop, collapsing to a single
+    column on mobile. The left column holds up to three pinned
+    articles (either manually pinned in rss-feeds.json or defaulted
+    to the latest stories). The center column contains a hero
+    carousel of four top stories with a slider, followed by a
+    "Top News" panel that clusters stories by topic and shows
+    sentiment bars and article counts. The right column lists
+    trending topics with aggregated sentiment, and a "Daily News"
+    list of the next few stories with thumbnails.
+
+  • Sentiment bars: Each article or topic displays a compact bar
+    divided into green (positive), grey (neutral) and black (negative)
+    segments. Percentages for positive and negative sentiment appear
+    below the bar. If the negative component exceeds 50%, a tooltip
+    appears on hover showing the top negative terms VADER detected.
+
+Everything on the site is live; no content is hardcoded. The
+Express server fetches RSS feeds and market data on a schedule
+and calculates sentiment on the fly.
+-->
