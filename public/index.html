@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Informed360</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Informed360</div>
+    <div id="ticker" class="ticker" aria-live="polite"></div>
+  </header>
+
+  <main class="layout">
+    <aside class="left">
+      <h2>Pinned News</h2>
+      <div id="pinned" class="card-list"></div>
+    </aside>
+
+    <section class="center">
+      <div class="hero">
+        <h2>Trending News</h2>
+        <div class="carousel" id="carousel" role="region" aria-label="Top stories">
+          <button class="nav prev" id="prev" aria-label="Previous">‹</button>
+          <div class="slides" id="slides"></div>
+          <button class="nav next" id="next" aria-label="Next">›</button>
+        </div>
+      </div>
+
+      <div class="top-news">
+        <h3>Top News (by volume)</h3>
+        <div id="topNews" class="grid"></div>
+      </div>
+    </section>
+
+    <aside class="right">
+      <h2>Trending Topics</h2>
+      <div id="trending" class="trend-list"></div>
+
+      <div class="daily">
+        <h3>Daily News</h3>
+        <div id="daily" class="daily-list"></div>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    <span>© <span id="year"></span> Informed360 — Live news & sentiment for readers.</span>
+  </footer>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
