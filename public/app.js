@@ -117,17 +117,7 @@ function renderPinned(){
   `).join("");
 }
 
-function renderTrending(){
-  document.getElementById("trending").innerHTML = state.trending.map(t => `
-    <div class="trend">
-      <div><strong>${t.topic}</strong></div>
-      ${renderSentiment({ posP: t.sentiment.pos, neuP: t.sentiment.neu, negP: t.sentiment.neg })}
-      <div class="meta">${t.count} articles</div>
-    </div>
-  `).join("");
-}
-
-function groupByTopic(arts){
+tion groupByTopic(arts){
   const map = new Map();
   arts.forEach(a => {
     const key = a.title.split(":")[0].split("—")[0].slice(0, 70);
@@ -142,10 +132,7 @@ function groupByTopic(arts){
       return { title: k, count: arr.length, sentiment: { posP: pos, negP: neg, neuP: neu } };
     })
     .sort((a, b) => b.count - a.count)
-    .slice(0, 6);
-}
-
-function renderTopNews(){
+ function renderTopNews(){
   document.getElementById("topNews").innerHTML = groupByTopic(state.articles).map(t => `
     <div class="tile">
       <strong>${t.title}</strong>
@@ -153,6 +140,8 @@ function renderTopNews(){
       <div class="meta">${t.count} articles</div>
     </div>
   `).join("");
+}
+
 }
 
 function renderDaily(){
