@@ -23,18 +23,17 @@
     <section class="center">
       <!-- Highlighted hero story (from the latest article) -->
       <div id="mainHero" class="main-hero"></div>
-      <div class="hero">
+      <!-- Trending News section: displays aggregated clusters of stories based on common phrases.
+           Each cluster shows the headline, an overall sentiment bar, the number of
+           matching articles and an image from the first story. A horizontal
+           scroller lets users navigate through the top clusters. -->
+      <div class="trending-news-section">
         <h2>Trending News</h2>
-        <div class="carousel" id="carousel" role="region" aria-label="Top stories">
-          <button class="nav prev" id="prev" aria-label="Previous">‹</button>
-          <div class="slides" id="slides"></div>
-          <button class="nav next" id="next" aria-label="Next">›</button>
+        <div class="topics-carousel" id="topicsCarousel" role="region" aria-label="Trending topics">
+          <button class="nav prev" id="topicPrev" aria-label="Previous">‹</button>
+          <div class="topic-slides" id="topicSlides"></div>
+          <button class="nav next" id="topicNext" aria-label="Next">›</button>
         </div>
-      </div>
-
-      <div class="top-news">
-        <h3>Top News (by volume)</h3>
-        <div id="topNews" class="grid"></div>
       </div>
     </section>
 
