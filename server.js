@@ -86,6 +86,7 @@ async function fetchTrendingFeed() {
  * compute a sentiment summary for each query. Each result contains the topic,
  * the number of articles whose title includes the query, and average sentiment.
  */
+    
 function computeTrendingFeedSentiment(queries, articles) {
   return queries.map((q) => {
     const qLower = q.toLowerCase();
@@ -93,18 +94,22 @@ function computeTrendingFeedSentiment(queries, articles) {
     let pos = 0;
     let neg = 0;
     let neu = 0;
+        const srcSet = new Set();
     articles.forEach((a) => {
       if ((a.title || "").toLowerCase().includes(qLower)) {
         count += 1;
         pos += a.sentiment.posP;
         neg += a.sentiment.negP;
+              srcSet.add(a.source);
         neu += a.sentiment.neuP;
       }
     });
     const denom = Math.max(1, count);
+        
     return {
       topic: q,
       count,
+          sources: srcSet.size,
       sentiment: {
         pos: Math.round(pos / denom),
         neg: Math.round(neg / denom),
