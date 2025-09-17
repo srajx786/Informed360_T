@@ -33,9 +33,7 @@ const state = {
 function applyTheme() {
   document.documentElement.setAttribute("data-theme", state.theme);
   const btn = document.getElementById("themeToggle");
-  if (btn) {
-    btn.textContent = state.theme === "light" ? "\uD83C\uDF19" : "\u2600\uFE0F";
-  }
+  if (btn) btn.textContent = state.theme === "light" ? "🌙" : "☀️";
 }
 
 function toggleTheme() {
@@ -44,13 +42,13 @@ function toggleTheme() {
   applyTheme();
 }
 
-async function fetchJSON(url){
+async function fetchJSON(url) {
   const res = await fetch(url);
   if(!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-async function loadAll(){
+async function loadAll() {
   const [news, trends, pins, ticker] = await Promise.all([
     fetchJSON("/api/news"),
     fetchJSON("/api/trending"),
@@ -58,24 +56,25 @@ async function loadAll(){
     fetchJSON("/api/ticker").catch(() => ({ quotes: [] }))
   ]);
   state.articles = news.articles;
-  state.trending = trends.topics;
+  state.trending = trends.topics || [];
   state.pins = pins.articles || [];
-  renderTicker(ticker.quotes || []);
+  renderTicker((ticker && ticker.quotes) || []);
   renderMainHero();
   renderCarousel();
   renderPinned();
   renderTrending();
   renderTopNews();
   renderDaily();
-  document.getElementById("year").textContent = new Date().getFullYear();
+  const yearElem = document.getElementById("year");
+  if (yearElem) yearElem.textContent = new Date().getFullYear();
   applyTheme();
 }
 
-function renderTicker(quotes){
+function renderTicker(quotes) {
   const indices = [
-    { symbol: "^BSESN", name: "BSE Sensex" },
-    { symbol: "^NSEI", name: "Nifty 50" },
-    { symbol: "^NYA", name: "NYSE Composite" }
+    { symbol:"^BSESN", name:"BSE Sensex" },
+    { symbol:"^NSEI", name:"Nifty 50" },
+    { symbol:"^NYA", name:"NYSE Composite" }
   ];
   const line = indices.map((info, idx) => {
     const q = (quotes && quotes[idx]) || {};
@@ -86,13 +85,13 @@ function renderTicker(quotes){
     const priceStr = price != null ? price.toFixed(2) : "--";
     const pctStr = changePct != null ? `${changePct}%` : "--";
     return `<span>${info.name}: <span class="${cls}">${priceStr} (${pctStr})</span></span>`;
-  }).join(" \u00B7 ");
+  }).join(" · ");
   document.getElementById("ticker").innerHTML = line;
 }
 
 function pickTop(arr, n){ return arr.slice(0, n); }
 
-function renderCarousel(){
+function renderCarousel() {
   const top4 = pickTop(state.articles, 4);
   document.getElementById("slides").innerHTML = top4.map(a => `
     <article class="slide">
@@ -106,7 +105,7 @@ function renderCarousel(){
   document.getElementById("next").onclick = () => document.getElementById("slides").scrollBy({ left: 400, behavior: "smooth" });
 }
 
-function renderPinned(){
+function renderPinned() {
   const pins = state.pins.length ? state.pins : pickTop(state.articles, 3);
   document.getElementById("pinned").innerHTML = pins.map(a => `
     <div class="card">
@@ -117,11 +116,26 @@ function renderPinned(){
   `).join("");
 }
 
-tion groupByTopic(arts){
+function renderTrending() {
+  document.getElementById("trending").innerHTML = state.trending.map(t => {
+    const metaParts = [];
+    if (typeof t.count === "number") metaParts.push(`${t.count} articles`);
+    if (typeof t.sources === "number") metaParts.push(`${t.sources} sources`);
+    return `
+      <div class="trend">
+        <div><strong>${t.topic}</strong></div>
+        ${renderSentiment({ posP: t.sentiment.pos, neuP: t.sentiment.neu, negP: t.sentiment.neg })}
+        <div class="meta">${metaParts.join(" · ")}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+function groupByTopic(arts) {
   const map = new Map();
   arts.forEach(a => {
-    const key = a.title.split(":")[0].split("—")[0].slice(0, 70);
-    if(!map.has(key)) map.set(key, []);
+    const key = a.title.split(":" )[0].split("—")[0].slice(0, 70);
+    if (!map.has(key)) map.set(key, []);
     map.get(key).push(a);
   });
   return [...map.entries()]
@@ -132,7 +146,10 @@ tion groupByTopic(arts){
       return { title: k, count: arr.length, sentiment: { posP: pos, negP: neg, neuP: neu } };
     })
     .sort((a, b) => b.count - a.count)
- function renderTopNews(){
+    .slice(0, 6);
+}
+
+function renderTopNews() {
   document.getElementById("topNews").innerHTML = groupByTopic(state.articles).map(t => `
     <div class="tile">
       <strong>${t.title}</strong>
@@ -142,9 +159,7 @@ tion groupByTopic(arts){
   `).join("");
 }
 
-}
-
-function renderDaily(){
+function renderDaily() {
   const daily = pickTop(state.articles.slice(4), 8);
   document.getElementById("daily").innerHTML = daily.map(a => `
     <a class="daily-item" href="${a.link}" target="_blank">
@@ -177,9 +192,11 @@ function renderMainHero() {
   `;
 }
 
+// Kick off initial load and refresh periodically
 loadAll();
 setInterval(loadAll, 1000 * 60 * 5);
 
+// Initialize theme and attach toggle handler once the DOM is ready
 applyTheme();
 const themeBtn = document.getElementById("themeToggle");
 if (themeBtn) {
