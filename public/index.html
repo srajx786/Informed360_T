@@ -10,6 +10,8 @@
   <header class="topbar">
     <div class="brand">Informed360</div>
     <div id="ticker" class="ticker" aria-live="polite"></div>
+    <!-- Theme toggle button (sun/moon icon set via JS) -->
+    <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme"></button>
   </header>
 
   <main class="layout">
@@ -19,6 +21,8 @@
     </aside>
 
     <section class="center">
+      <!-- Highlighted hero story (from the latest article) -->
+      <div id="mainHero" class="main-hero"></div>
       <div class="hero">
         <h2>Trending News</h2>
         <div class="carousel" id="carousel" role="region" aria-label="Top stories">
