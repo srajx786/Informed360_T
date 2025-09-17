@@ -3,9 +3,9 @@ const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const fmtPct = (n) => `${Math.max(0, Math.min(100, Math.round(n)))}%`;
 
 const renderSentiment = (s, tip="") => {
-  const pos = Math.max(0, s.posP);
-  const neu = Math.max(0, s.neuP);
-  const neg = Math.max(0, s.negP);
+  const pos = Math.max(0, s.posP || 0);
+  const neu = Math.max(0, s.neuP || 0);
+  const neg = Math.max(0, s.negP || 0);
   const negTip = neg > 50 ? tip || "This article skews negative." : "";
   return `
     <div class="sentiment tooltip" ${negTip ? `data-tip="${negTip}"` : ""}>
@@ -22,7 +22,27 @@ const renderSentiment = (s, tip="") => {
   `;
 };
 
-const state = { articles: [], trending: [], pins: [], slideIndex: 0 };
+const state = {
+  articles: [],
+  trending: [],
+  pins: [],
+  slideIndex: 0,
+  theme: localStorage.getItem("theme") || "dark"
+};
+
+function applyTheme() {
+  document.documentElement.setAttribute("data-theme", state.theme);
+  const btn = document.getElementById("themeToggle");
+  if (btn) {
+    btn.textContent = state.theme === "light" ? "\uD83C\uDF19" : "\u2600\uFE0F";
+  }
+}
+
+function toggleTheme() {
+  state.theme = state.theme === "light" ? "dark" : "light";
+  localStorage.setItem("theme", state.theme);
+  applyTheme();
+}
 
 async function fetchJSON(url){
   const res = await fetch(url);
@@ -41,29 +61,40 @@ async function loadAll(){
   state.trending = trends.topics;
   state.pins = pins.articles || [];
   renderTicker(ticker.quotes || []);
+  renderMainHero();
   renderCarousel();
   renderPinned();
   renderTrending();
   renderTopNews();
   renderDaily();
-  $("#year").textContent = new Date().getFullYear();
+  document.getElementById("year").textContent = new Date().getFullYear();
+  applyTheme();
 }
 
 function renderTicker(quotes){
-  const line = quotes.map(q => {
-    const cls = q.change >= 0 ? "up" : "down";
-    const label = (q.shortName || q.symbol).replace("Index","").trim();
-    const pct = (q.changePercent * 100).toFixed(2);
-    return `<span>${label}: <span class="${cls}">${q.price?.toFixed?.(2) ?? "-"} (${pct}%)</span></span>`;
-  }).join(" · ");
-  $("#ticker").innerHTML = line;
+  const indices = [
+    { symbol: "^BSESN", name: "BSE Sensex" },
+    { symbol: "^NSEI", name: "Nifty 50" },
+    { symbol: "^NYA", name: "NYSE Composite" }
+  ];
+  const line = indices.map((info, idx) => {
+    const q = (quotes && quotes[idx]) || {};
+    const change = typeof q.change === "number" ? q.change : 0;
+    const price = typeof q.price === "number" ? q.price : null;
+    const changePct = typeof q.changePercent === "number" ? (q.changePercent * 100).toFixed(2) : null;
+    const cls = change >= 0 ? "up" : "down";
+    const priceStr = price != null ? price.toFixed(2) : "--";
+    const pctStr = changePct != null ? `${changePct}%` : "--";
+    return `<span>${info.name}: <span class="${cls}">${priceStr} (${pctStr})</span></span>`;
+  }).join(" \u00B7 ");
+  document.getElementById("ticker").innerHTML = line;
 }
 
 function pickTop(arr, n){ return arr.slice(0, n); }
 
 function renderCarousel(){
   const top4 = pickTop(state.articles, 4);
-  $("#slides").innerHTML = top4.map(a => `
+  document.getElementById("slides").innerHTML = top4.map(a => `
     <article class="slide">
       <img src="${a.image}" alt="">
       <a href="${a.link}" target="_blank"><strong>${a.title}</strong></a>
@@ -71,13 +102,13 @@ function renderCarousel(){
       ${renderSentiment(a.sentiment, a.tooltip)}
     </article>
   `).join("");
-  $("#prev").onclick = () => $("#slides").scrollBy({ left: -400, behavior: "smooth" });
-  $("#next").onclick = () => $("#slides").scrollBy({ left: 400, behavior: "smooth" });
+  document.getElementById("prev").onclick = () => document.getElementById("slides").scrollBy({ left: -400, behavior: "smooth" });
+  document.getElementById("next").onclick = () => document.getElementById("slides").scrollBy({ left: 400, behavior: "smooth" });
 }
 
 function renderPinned(){
   const pins = state.pins.length ? state.pins : pickTop(state.articles, 3);
-  $("#pinned").innerHTML = pins.map(a => `
+  document.getElementById("pinned").innerHTML = pins.map(a => `
     <div class="card">
       <a href="${a.link}" target="_blank"><strong>${a.title}</strong></a>
       <div class="meta"><span class="source">${a.source}</span></div>
@@ -87,7 +118,7 @@ function renderPinned(){
 }
 
 function renderTrending(){
-  $("#trending").innerHTML = state.trending.map(t => `
+  document.getElementById("trending").innerHTML = state.trending.map(t => `
     <div class="trend">
       <div><strong>${t.topic}</strong></div>
       ${renderSentiment({ posP: t.sentiment.pos, neuP: t.sentiment.neu, negP: t.sentiment.neg })}
@@ -115,7 +146,7 @@ function groupByTopic(arts){
 }
 
 function renderTopNews(){
-  $("#topNews").innerHTML = groupByTopic(state.articles).map(t => `
+  document.getElementById("topNews").innerHTML = groupByTopic(state.articles).map(t => `
     <div class="tile">
       <strong>${t.title}</strong>
       ${renderSentiment(t.sentiment)}
@@ -126,7 +157,7 @@ function renderTopNews(){
 
 function renderDaily(){
   const daily = pickTop(state.articles.slice(4), 8);
-  $("#daily").innerHTML = daily.map(a => `
+  document.getElementById("daily").innerHTML = daily.map(a => `
     <a class="daily-item" href="${a.link}" target="_blank">
       <img src="${a.image}" alt="">
       <div>
@@ -138,5 +169,30 @@ function renderDaily(){
   `).join("");
 }
 
+function renderMainHero() {
+  const hero = state.articles.length ? state.articles[0] : null;
+  const container = document.getElementById("mainHero");
+  if (!container) return;
+  if (!hero) {
+    container.innerHTML = "";
+    return;
+  }
+  container.innerHTML = `
+    <div class="hero-img"><img src="${hero.image}" alt=""></div>
+    <div class="hero-content">
+      <h3>${hero.title}</h3>
+      <a href="${hero.link}" target="_blank" class="analysis-link">Read Analysis</a>
+      ${renderSentiment(hero.sentiment, hero.tooltip)}
+      <div class="meta"><span class="source">${hero.source}</span> · <span>${new Date(hero.publishedAt).toLocaleString()}</span></div>
+    </div>
+  `;
+}
+
 loadAll();
 setInterval(loadAll, 1000 * 60 * 5);
+
+applyTheme();
+const themeBtn = document.getElementById("themeToggle");
+if (themeBtn) {
+  themeBtn.addEventListener("click", toggleTheme);
+}
