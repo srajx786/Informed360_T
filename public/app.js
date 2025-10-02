@@ -6,11 +6,10 @@ const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const fmtPct = (n) => `${Math.max(0, Math.min(100, Math.round(n)))}%`;
 
 // Render a sentiment bar given a sentiment object {posP, neuP, negP}
-// Optionally accepts a tooltip string that appears when negative > 50%
-const renderSentiment = (s, tip="") => {
-  const pos = Math.max(0, s.posP);
-  const neu = Math.max(0, s.neuP);
-  const neg = Math.max(0, s.negP);
+const renderSentiment = (s, tip = "") => {
+  const pos = Math.max(0, Number(s.posP) || 0);
+  const neu = Math.max(0, Number(s.neuP) || 0);
+  const neg = Math.max(0, Number(s.negP) || 0);
   const negTip = neg > 50 ? tip || "This article skews negative." : "";
   return `
     <div class="sentiment tooltip" ${negTip ? `data-tip="${negTip}"` : ""}>
@@ -30,80 +29,57 @@ const renderSentiment = (s, tip="") => {
 // Application state
 const state = {
   articles: [],
-  /**
-   * topics holds the aggregated news clusters returned from the server.  Each
-   * cluster summarises multiple stories that share a common phrase and
-   * includes an image, sentiment summary and article count.  This array
-   * powers the Trending News carousel.
-   */
-  topics: [],
-  /**
-   * trending holds the Google Trends queries and sentiment summary.  Each
-   * entry contains the search topic, the number of matching articles and
-   * aggregated sentiment across those articles.
-   */
-  trending: [],
   pins: [],
-  slideIndex: 0,
-  // Persist theme preference (dark/light) in localStorage
   theme: localStorage.getItem("theme") || "dark"
 };
 
-// Apply the current theme by setting a data attribute and toggling the icon
+// Apply current theme
 function applyTheme() {
   document.documentElement.setAttribute("data-theme", state.theme);
   const btn = document.getElementById("themeToggle");
-  if (btn) {
-    // Use a sun icon for dark mode (to switch to light) and moon for light
-    btn.textContent = state.theme === "light" ? "🌙" : "☀️";
-  }
+  if (btn) btn.textContent = state.theme === "light" ? "🌙" : "☀️";
 }
 
-// Toggle between dark and light themes
 function toggleTheme() {
   state.theme = state.theme === "light" ? "dark" : "light";
   localStorage.setItem("theme", state.theme);
   applyTheme();
 }
 
-// Fetch JSON from an endpoint
+// Fetch JSON helper
 async function fetchJSON(url){
   const res = await fetch(url);
   if(!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-// Load all data and render the page
+// Load all data and render
 async function loadAll(){
-  const [news, clusters, trends, pins, ticker] = await Promise.all([
+  const [news, pins, ticker] = await Promise.all([
     fetchJSON("/api/news"),
-    fetchJSON("/api/topics"),
-    fetchJSON("/api/trending"),
     fetchJSON("/api/pinned"),
     fetchJSON("/api/ticker").catch(() => ({ quotes: [] }))
   ]);
-  state.articles = news.articles;
-  state.topics = (clusters && clusters.topics) || [];
-  state.trending = trends.topics;
+
+  state.articles = news.articles || [];
   state.pins = pins.articles || [];
+
   renderTicker(ticker.quotes || []);
   renderMainHero();
-  renderTopics();
   renderPinned();
-  renderTrending();
+  renderNewsList();  // clean, uncluttered list
   renderDaily();
+
   $("#year").textContent = new Date().getFullYear();
-  // Update theme after data loads (ensures button exists)
   applyTheme();
 }
 
-// Render the live market ticker
+// Market ticker
 function renderTicker(quotes){
-  // Define the expected indices and names; fall back to dashes if no quote available
   const indices = [
     { symbol: "^BSESN", name: "BSE Sensex" },
     { symbol: "^NSEI", name: "Nifty 50" },
-    { symbol: "^NYA", name: "NYSE Composite" }
+    { symbol: "^NYA",  name: "NYSE Composite" }
   ];
   const line = indices.map((info, idx) => {
     const q = (quotes && quotes[idx]) || {};
@@ -118,25 +94,10 @@ function renderTicker(quotes){
   $("#ticker").innerHTML = line;
 }
 
-// Helper to take the first n items of an array
+// Helper
 function pickTop(arr, n){ return arr.slice(0, n); }
 
-// Render the hero carousel with the top four articles
-function renderCarousel(){
-  const top4 = pickTop(state.articles, 4);
-  $("#slides").innerHTML = top4.map(a => `
-    <article class="slide">
-      <img src="${a.image}" alt="">
-      <a href="${a.link}" target="_blank"><strong>${a.title}</strong></a>
-      <div class="meta"><span class="source">${a.source}</span> <span>•</span> <span>${new Date(a.publishedAt).toLocaleString()}</span></div>
-      ${renderSentiment(a.sentiment, a.tooltip)}
-    </article>
-  `).join("");
-  $("#prev").onclick = () => $("#slides").scrollBy({ left: -400, behavior: "smooth" });
-  $("#next").onclick = () => $("#slides").scrollBy({ left: 400, behavior: "smooth" });
-}
-
-// Render pinned news cards
+// Pinned cards (left)
 function renderPinned(){
   const pins = state.pins.length ? state.pins : pickTop(state.articles, 3);
   $("#pinned").innerHTML = pins.map(a => `
@@ -148,85 +109,27 @@ function renderPinned(){
   `).join("");
 }
 
-// Render the list of trending topics with aggregated sentiment
-function renderTrending(){
-  $("#trending").innerHTML = state.trending.map(t => {
-    const sentimentData = { posP: t.sentiment.pos, neuP: t.sentiment.neu, negP: t.sentiment.neg };
-    const sources = typeof t.sources === "number" && t.sources > 0 ? t.sources : null;
-    const metaParts = [];
-    metaParts.push(`${t.count} articles`);
-    if (sources) metaParts.push(`${sources} sources`);
-    return `
-      <div class="trend">
-        <div><strong>${t.topic}</strong></div>
-        ${renderSentiment(sentimentData)}
-        <div class="meta">${metaParts.join(" · ")}</div>
+// Clean News list (center)
+function renderNewsList(){
+  // Skip the first article, which is used for the hero card
+  const list = state.articles.slice(1, 10);
+  $("#newsList").innerHTML = list.map(a => `
+    <a class="news-item" href="${a.link}" target="_blank" rel="noopener">
+      <img class="thumb" src="${a.image}" alt="">
+      <div>
+        <div class="title">${a.title}</div>
+        <div class="meta"><span class="source">${a.source}</span> · <span>${new Date(a.publishedAt).toLocaleString()}</span></div>
+        ${renderSentiment(a.sentiment, a.tooltip)}
       </div>
-    `;
-  }).join("");
-}
-
-// Render the aggregated news clusters into the Trending News carousel.  Each
-// cluster card shows the phrase that links the articles together, a
-// sentiment bar, the number of articles reviewed and a representative
-// image.  The horizontal scroller allows navigation through the list.
-function renderTopics(){
-  const slides = document.getElementById("topicSlides");
-  if (!slides) return;
-  const topics = state.topics || [];
-  slides.innerHTML = topics.map(t => `
-    <article class="topic-card">
-      <div class="text">
-        <div class="title">${t.title}</div>
-        <div class="count">${t.count} articles</div>
-        ${renderSentiment(t.sentiment)}
-      </div>
-      <img src="${t.image}" alt="">
-    </article>
-  `).join("");
-  // Attach horizontal scroll behaviour to the navigation buttons
-  const container = slides;
-  const prevBtn = document.getElementById("topicPrev");
-  const nextBtn = document.getElementById("topicNext");
-  if (prevBtn) prevBtn.onclick = () => container.scrollBy({ left: -400, behavior: "smooth" });
-  if (nextBtn) nextBtn.onclick = () => container.scrollBy({ left: 400, behavior: "smooth" });
-}
-
-// Group articles into topics by prefix before colon or dash
-function groupByTopic(arts){
-  const map = new Map();
-  arts.forEach(a => {
-    const key = a.title.split(":")[0].split("—")[0].slice(0, 70);
-    if(!map.has(key)) map.set(key, []);
-    map.get(key).push(a);
-  });
-  return [...map.entries()]
-    .map(([k, arr]) => {
-      const pos = Math.round(arr.reduce((s, x) => s + x.sentiment.posP, 0) / arr.length);
-      const neg = Math.round(arr.reduce((s, x) => s + x.sentiment.negP, 0) / arr.length);
-      const neu = Math.max(0, 100 - pos - neg);
-      return { title: k, count: arr.length, sentiment: { posP: pos, negP: neg, neuP: neu } };
-    })
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6);
-}
-
-// Render the top news panel, grouped by topic (not currently used in the new design)
-function renderTopNews(){
-  $("#topNews").innerHTML = groupByTopic(state.articles).map(t => `
-    <div class="tile">
-      <strong>${t.title}</strong>
-      ${renderSentiment(t.sentiment)}
-      <div class="meta">${t.count} articles</div>
-    </div>
+    </a>
   `).join("");
 }
 
-// Render the daily news list with thumbnails and sentiment bars
+// Daily list (right)
 function renderDaily(){
-  const daily = pickTop(state.articles.slice(4), 8);
+  const daily = pickTop(state.articles.slice(10), 8);
   $("#daily").innerHTML = daily.map(a => `
-    <a class="daily-item" href="${a.link}" target="_blank">
+    <a class="daily-item" href="${a.link}" target="_blank" rel="noopener">
       <img src="${a.image}" alt="">
       <div>
         <div><strong>${a.title}</strong></div>
@@ -237,15 +140,12 @@ function renderDaily(){
   `).join("");
 }
 
-// Render a large hero card showcasing the most recent article
+// Hero (first article)
 function renderMainHero() {
   const hero = state.articles.length ? state.articles[0] : null;
   const container = document.getElementById("mainHero");
   if (!container) return;
-  if (!hero) {
-    container.innerHTML = "";
-    return;
-  }
+  if (!hero) { container.innerHTML = ""; return; }
   container.innerHTML = `
     <div class="hero-img"><img src="${hero.image}" alt=""></div>
     <div class="hero-content">
@@ -257,13 +157,10 @@ function renderMainHero() {
   `;
 }
 
-// Kick off initial load and refresh periodically
+// Init
 loadAll();
 setInterval(loadAll, 1000 * 60 * 5);
 
-// Initialize theme and attach toggle handler once the DOM is ready
 applyTheme();
 const themeBtn = document.getElementById("themeToggle");
-if (themeBtn) {
-  themeBtn.addEventListener("click", toggleTheme);
-}
+if (themeBtn) themeBtn.addEventListener("click", toggleTheme);
