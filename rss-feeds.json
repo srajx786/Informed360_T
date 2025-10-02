@@ -1,12 +1,15 @@
 {
-  "pinned": [],
   "feeds": [
-    "https://feeds.bbci.co.uk/news/world/rss.xml",
-    "https://www.aljazeera.com/xml/rss/all.xml",
-    "https://feeds.a.dj.com/rss/RSSWorldNews.xml",
-    "https://www.reuters.com/world/rss",
-    "https://www.hindustantimes.com/feeds/rss/world-news/rssfeed.xml",
-    "https://www.livemint.com/rss/markets"
+    "https://timesofindia.indiatimes.com/rssfeedstopstories.cms",
+    "https://feeds.feedburner.com/NDTV-LatestNews",
+    "https://www.indiatoday.in/rss/home",
+    "https://indianexpress.com/feed/",
+    "https://www.thehindu.com/news/national/feeder/default.rss",
+    "https://www.hindustantimes.com/feeds/rss/india-news/rssfeed.xml",
+    "https://www.livemint.com/rss/news",
+    "https://www.firstpost.com/feed",
+    "https://www.business-standard.com/rss/latestRSS.cms",
+    "https://scroll.in/feed"
   ],
-  "refreshMinutes": 7
+  "pinned": []
 }
