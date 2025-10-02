@@ -33,13 +33,12 @@ const state = {
   theme: localStorage.getItem("theme") || "dark"
 };
 
-// Apply current theme
+// Theme
 function applyTheme() {
   document.documentElement.setAttribute("data-theme", state.theme);
   const btn = document.getElementById("themeToggle");
   if (btn) btn.textContent = state.theme === "light" ? "🌙" : "☀️";
 }
-
 function toggleTheme() {
   state.theme = state.theme === "light" ? "dark" : "light";
   localStorage.setItem("theme", state.theme);
@@ -53,7 +52,7 @@ async function fetchJSON(url){
   return res.json();
 }
 
-// Load all data and render
+// Load and render
 async function loadAll(){
   const [news, pins, ticker] = await Promise.all([
     fetchJSON("/api/news"),
@@ -67,7 +66,7 @@ async function loadAll(){
   renderTicker(ticker.quotes || []);
   renderMainHero();
   renderPinned();
-  renderNewsList();  // clean, uncluttered list
+  renderNewsList();
   renderDaily();
 
   $("#year").textContent = new Date().getFullYear();
@@ -94,10 +93,10 @@ function renderTicker(quotes){
   $("#ticker").innerHTML = line;
 }
 
-// Helper
+// Helpers
 function pickTop(arr, n){ return arr.slice(0, n); }
 
-// Pinned cards (left)
+// Pinned (left)
 function renderPinned(){
   const pins = state.pins.length ? state.pins : pickTop(state.articles, 3);
   $("#pinned").innerHTML = pins.map(a => `
@@ -109,10 +108,9 @@ function renderPinned(){
   `).join("");
 }
 
-// Clean News list (center)
+// News list (center)
 function renderNewsList(){
-  // Skip the first article, which is used for the hero card
-  const list = state.articles.slice(1, 10);
+  const list = state.articles.slice(1, 10); // first goes to hero
   $("#newsList").innerHTML = list.map(a => `
     <a class="news-item" href="${a.link}" target="_blank" rel="noopener">
       <img class="thumb" src="${a.image}" alt="">
@@ -125,7 +123,7 @@ function renderNewsList(){
   `).join("");
 }
 
-// Daily list (right)
+// Daily (right)
 function renderDaily(){
   const daily = pickTop(state.articles.slice(10), 8);
   $("#daily").innerHTML = daily.map(a => `
