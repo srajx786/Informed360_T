@@ -1,14 +1,21 @@
-/* Global variables for colours and spacing */
+/*
+ * Global styles for Informed 360.
+ * Inspired by Ground News, this layout uses a three‑column grid with
+ * pinned articles on the left, a hero and news list in the centre, and
+ * trending topics plus a daily feed on the right.
+ */
+
 :root{
+  /* Base colours for dark theme */
   --bg:#0d0f12;
   --fg:#e9eef2;
   --muted:#9aa4ad;
   --card:#161a1f;
   --border:#232a31;
-  /* Sentiment colors (match screenshot 2) */
-  --green:#2ecc71; /* positive */
-  --grey:#bdc3c7;  /* neutral  */
-  --red:#ff4c4c;   /* negative */
+  /* Sentiment colours for positive/neutral/negative */
+  --green:#2ecc71;
+  --grey:#bdc3c7;
+  --red:#ff4c4c;
   --black:#000;
 }
 
@@ -29,7 +36,7 @@
 
 body{
   margin:0;
-  font:15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+  font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Inter,Arial,sans-serif;
   background:var(--bg);
   color:var(--fg);
 }
@@ -53,7 +60,8 @@ img{
 }
 .brand{ font-weight:800; letter-spacing:.2px; }
 .ticker{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--muted); }
-.ticker .up{ color:#56d37a; } .ticker .down{ color:#ff6b6b; }
+.ticker .up{ color:#56d37a; }
+.ticker .down{ color:#ff6b6b; }
 .theme-toggle{ background:none; border:none; color:var(--muted); font-size:1.4rem; cursor:pointer; padding:0 .5rem; }
 
 /* Grid layout */
@@ -85,7 +93,7 @@ img{
   background:#2563eb; color:#fff; font-size:.85rem; font-weight:600; text-align:center; width:max-content;
 }
 
-/* Clean News list (center) */
+/* Clean news list (centre) */
 .news-section{ margin-top:1rem; }
 .news-list{ display:flex; flex-direction:column; gap:.75rem; }
 .news-item{
@@ -108,7 +116,7 @@ img{
   background:var(--card); border:1px solid var(--border); padding:.5rem; border-radius:12px;
 }
 
-/* Sentiment bar component — matches screenshot 2 */
+/* Sentiment bar */
 .sentiment{
   display:flex;
   flex-direction:column;
@@ -132,7 +140,7 @@ img{
   color:var(--muted);
 }
 
-/* Tooltip for negative articles */
+/* Tooltip for negative sentiment */
 .tooltip{ position:relative; }
 .tooltip[data-tip]:hover::after{
   content:attr(data-tip);
@@ -141,10 +149,42 @@ img{
   padding:.4rem .55rem; border-radius:8px; white-space:wrap; width:260px; z-index:3;
 }
 
-/* Footer */
-.footer{ padding:1rem; color:var(--muted); border-top:1px solid var(--border); margin-top:1rem; }
+/* Topics section */
+.topics-list{
+  display:flex;
+  flex-direction:column;
+  gap:.75rem;
+  margin-top:.5rem;
+}
+.topic-item{
+  background:var(--card);
+  border:1px solid var(--border);
+  padding:.6rem .75rem;
+  border-radius:12px;
+  display:flex;
+  flex-direction:column;
+  gap:.45rem;
+}
+.topic-item .topic-header{
+  font-weight:700;
+  line-height:1.25;
+}
+.topic-item .topic-meta{
+  font-size:.8rem;
+  color:var(--muted);
+  display:flex;
+  gap:.5rem;
+}
 
-/* Responsive */
+/* Footer */
+.footer{
+  padding:1rem;
+  color:var(--muted);
+  border-top:1px solid var(--border);
+  margin-top:1rem;
+}
+
+/* Responsiveness */
 @media (max-width:1100px){
   .layout{ grid-template-columns:1fr; }
   .left,.right{ order:2; }
