@@ -1,152 +1,47 @@
-/* Global variables for colours and spacing */
-:root{
-  --bg:#0d0f12;
-  --fg:#e9eef2;
-  --muted:#9aa4ad;
-  --card:#161a1f;
-  --border:#232a31;
-  /* Sentiment colors (match screenshot 2) */
-  --green:#2ecc71; /* positive */
-  --grey:#bdc3c7;  /* neutral  */
-  --red:#ff4c4c;   /* negative */
-  --black:#000;
-}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Informed360</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Informed360</div>
+    <div id="ticker" class="ticker" aria-live="polite"></div>
+    <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme"></button>
+  </header>
 
-/* Light theme overrides */
-[data-theme="light"]{
-  --bg:#f7f8fa;
-  --fg:#101418;
-  --muted:#606f7b;
-  --card:#ffffff;
-  --border:#dfe5ec;
-  --green:#2a9d8f;
-  --grey:#c0c5cb;
-  --red:#ef4444;
-  --black:#374151;
-}
+  <main class="layout">
+    <aside class="left">
+      <h2>Pinned News</h2>
+      <div id="pinned" class="card-list"></div>
+    </aside>
 
-*{ box-sizing:border-box; }
+    <section class="center">
+      <!-- Hero story (latest article) -->
+      <div id="mainHero" class="main-hero"></div>
 
-body{
-  margin:0;
-  font:15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, Inter, Arial, sans-serif;
-  background:var(--bg);
-  color:var(--fg);
-}
+      <!-- Aggregated clusters like Ground News -->
+      <div class="news-section">
+        <h2>News</h2>
+        <div id="newsList" class="news-list"></div>
+      </div>
+    </section>
 
-a{ color:inherit; text-decoration:none; }
-h2,h3{ margin:0 0 .5rem; }
+    <aside class="right">
+      <div class="daily">
+        <h3>Daily News</h3>
+        <div id="daily" class="daily-list"></div>
+      </div>
+    </aside>
+  </main>
 
-img{
-  display:block;
-  max-width:100%;
-  height:auto;
-  border-radius:10px;
-}
+  <footer class="footer">
+    <span>© <span id="year"></span> Informed360 — Live news & sentiment for readers.</span>
+  </footer>
 
-/* Top bar */
-.topbar{
-  position:sticky; top:0; z-index:10;
-  display:flex; gap:1rem; align-items:center; justify-content:space-between;
-  padding:.75rem 1rem; border-bottom:1px solid var(--border);
-  background:#0f1216cc; backdrop-filter:saturate(150%) blur(6px);
-}
-.brand{ font-weight:800; letter-spacing:.2px; }
-.ticker{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--muted); }
-.ticker .up{ color:#56d37a; } .ticker .down{ color:#ff6b6b; }
-.theme-toggle{ background:none; border:none; color:var(--muted); font-size:1.4rem; cursor:pointer; padding:0 .5rem; }
-
-/* Grid layout */
-.layout{
-  display:grid;
-  grid-template-columns:280px 1fr 340px;
-  gap:1rem;
-  padding:1rem;
-  max-width:1300px;
-  margin:0 auto;
-}
-.left,.right{ display:flex; flex-direction:column; gap:.75rem; }
-
-.card{ background:var(--card); border:1px solid var(--border); padding:.75rem; border-radius:14px; }
-.card-list{ display:flex; flex-direction:column; gap:.75rem; }
-
-/* Main hero */
-.main-hero{
-  display:flex; flex-wrap:wrap; gap:1rem;
-  background:var(--card); border:1px solid var(--border);
-  border-radius:14px; padding:.75rem; margin-bottom:1rem;
-}
-.main-hero .hero-img{ flex:1 1 40%; min-width:200px; max-height:200px; overflow:hidden; }
-.main-hero .hero-img img{ width:100%; height:100%; object-fit:cover; border-radius:10px; }
-.main-hero .hero-content{ flex:1 1 55%; display:flex; flex-direction:column; gap:.6rem; }
-.main-hero .hero-content h3{ margin:0; font-size:1.2rem; line-height:1.3; }
-.main-hero .analysis-link{
-  display:inline-block; padding:.45rem .8rem; border-radius:8px;
-  background:#2563eb; color:#fff; font-size:.85rem; font-weight:600; text-align:center; width:max-content;
-}
-
-/* Clean News list (center) */
-.news-section{ margin-top:1rem; }
-.news-list{ display:flex; flex-direction:column; gap:.75rem; }
-.news-item{
-  display:grid; grid-template-columns:96px 1fr; gap:.75rem; align-items:start;
-  background:var(--card); border:1px solid var(--border); padding:.6rem .75rem; border-radius:12px;
-}
-.news-item .thumb{
-  width:96px; height:72px; border-radius:8px; object-fit:cover; background:#111;
-}
-.news-item .title{
-  font-weight:800; line-height:1.25;
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
-}
-.news-item .meta{ color:var(--muted); font-size:.85rem; display:flex; gap:.5rem; align-items:center; }
-
-/* Daily (right) */
-.daily-list{ display:flex; flex-direction:column; gap:.75rem; margin-top:.5rem; }
-.daily-item{
-  display:grid; grid-template-columns:64px 1fr; gap:.75rem; align-items:center;
-  background:var(--card); border:1px solid var(--border); padding:.5rem; border-radius:12px;
-}
-
-/* Sentiment bar component — matches screenshot 2 */
-.sentiment{
-  display:flex;
-  flex-direction:column;
-  gap:.25rem;
-}
-.bar{
-  height:10px;
-  border-radius:999px;
-  overflow:hidden;
-  background:#222;
-  border:1px solid var(--border);
-}
-.segment{ height:100%; float:left; }
-.segment.pos{ background:var(--green); }
-.segment.neu{ background:var(--grey); }
-.segment.neg{ background:var(--red); }
-.scores{
-  display:flex;
-  justify-content:space-between;
-  font-size:.8rem;
-  color:var(--muted);
-}
-
-/* Tooltip for negative articles */
-.tooltip{ position:relative; }
-.tooltip[data-tip]:hover::after{
-  content:attr(data-tip);
-  position:absolute; left:0; top:125%;
-  background:#111; border:1px solid var(--border); color:var(--fg);
-  padding:.4rem .55rem; border-radius:8px; white-space:wrap; width:260px; z-index:3;
-}
-
-/* Footer */
-.footer{ padding:1rem; color:var(--muted); border-top:1px solid var(--border); margin-top:1rem; }
-
-/* Responsive */
-@media (max-width:1100px){
-  .layout{ grid-template-columns:1fr; }
-  .left,.right{ order:2; }
-  .center{ order:1; }
-}
+  <script src="app.js" defer></script>
+</body>
+</html>
