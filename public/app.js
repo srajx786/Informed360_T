@@ -1,16 +1,18 @@
-// ---------- Helpers ----------
-const $  = (s, r=document) => r.querySelector(s);
+// Utility selectors
+const $ = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+
+// Format a number as a percentage string
 const fmtPct = (n) => `${Math.max(0, Math.min(100, Math.round(n)))}%`;
 
-// Reusable sentiment renderer (expects {posP, neuP, negP})
+// Render a sentiment bar given a sentiment object {posP, neuP, negP}
 const renderSentiment = (s, tip = "") => {
   const pos = Math.max(0, Number(s.posP) || 0);
   const neu = Math.max(0, Number(s.neuP) || 0);
   const neg = Math.max(0, Number(s.negP) || 0);
-  const negTip = neg > 50 ? tip || "This article set skews negative." : "";
+  const negTip = neg > 50 ? tip || "This article skews negative." : "";
   return `
-    <div class="sentiment" ${negTip ? `data-tip="${negTip}"` : ""}>
+    <div class="sentiment tooltip" ${negTip ? `data-tip="${negTip}"` : ""}>
       <div class="bar">
         <span class="segment pos" style="width:${pos}%"></span>
         <span class="segment neu" style="width:${neu}%"></span>
@@ -24,139 +26,139 @@ const renderSentiment = (s, tip = "") => {
   `;
 };
 
-// ---------- State ----------
+// Application state
 const state = {
   articles: [],
-  clusters: [],
   pins: [],
   theme: localStorage.getItem("theme") || "dark"
 };
 
-// ---------- Theme ----------
-function applyTheme(){
+// Theme
+function applyTheme() {
   document.documentElement.setAttribute("data-theme", state.theme);
-  const t = $("#themeToggle");
-  if (t) t.textContent = state.theme === "light" ? "🌙" : "☀️";
+  const btn = document.getElementById("themeToggle");
+  if (btn) btn.textContent = state.theme === "light" ? "🌙" : "☀️";
 }
-function toggleTheme(){
+function toggleTheme() {
   state.theme = state.theme === "light" ? "dark" : "light";
   localStorage.setItem("theme", state.theme);
   applyTheme();
 }
 
-// ---------- Data ----------
+// Fetch JSON helper
 async function fetchJSON(url){
   const res = await fetch(url);
-  if (!res.ok) throw new Error(await res.text());
+  if(!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
+// Load and render
 async function loadAll(){
-  const [news, topics, pins, ticker] = await Promise.all([
+  const [news, pins, ticker] = await Promise.all([
     fetchJSON("/api/news"),
-    fetchJSON("/api/topics"),
     fetchJSON("/api/pinned"),
     fetchJSON("/api/ticker").catch(() => ({ quotes: [] }))
   ]);
 
   state.articles = news.articles || [];
-  state.clusters  = (topics && topics.topics) || [];
-  state.pins      = pins.articles || [];
+  state.pins = pins.articles || [];
 
   renderTicker(ticker.quotes || []);
   renderMainHero();
   renderPinned();
-  renderClusterNews(); // <— aggregated center list
+  renderNewsList();
   renderDaily();
 
   $("#year").textContent = new Date().getFullYear();
   applyTheme();
 }
 
-// ---------- UI: top ticker ----------
+// Market ticker
 function renderTicker(quotes){
   const indices = [
     { symbol: "^BSESN", name: "BSE Sensex" },
-    { symbol: "^NSEI",  name: "Nifty 50" },
-    { symbol: "^NYA",   name: "NYSE Composite" }
+    { symbol: "^NSEI", name: "Nifty 50" },
+    { symbol: "^NYA",  name: "NYSE Composite" }
   ];
-  const line = indices.map((info, i) => {
-    const q = quotes?.[i] || {};
+  const line = indices.map((info, idx) => {
+    const q = (quotes && quotes[idx]) || {};
     const change = typeof q.change === "number" ? q.change : 0;
     const price = typeof q.price === "number" ? q.price : null;
-    const pct   = typeof q.changePercent === "number" ? (q.changePercent * 100).toFixed(2) : null;
-    const cls   = change >= 0 ? "up" : "down";
-    return `<span>${info.name}: <span class="${cls}">${price != null ? price.toFixed(2) : "--"} (${pct != null ? pct + "%" : "--"})</span></span>`;
+    const changePct = typeof q.changePercent === "number" ? (q.changePercent * 100).toFixed(2) : null;
+    const cls = change >= 0 ? "up" : "down";
+    const priceStr = price != null ? price.toFixed(2) : "--";
+    const pctStr = changePct != null ? `${changePct}%` : "--";
+    return `<span>${info.name}: <span class="${cls}">${priceStr} (${pctStr})</span></span>`;
   }).join(" · ");
   $("#ticker").innerHTML = line;
 }
 
-// ---------- UI: left pinned ----------
+// Helpers
 function pickTop(arr, n){ return arr.slice(0, n); }
+
+// Pinned (left)
 function renderPinned(){
   const pins = state.pins.length ? state.pins : pickTop(state.articles, 3);
   $("#pinned").innerHTML = pins.map(a => `
     <div class="card">
       <a href="${a.link}" target="_blank"><strong>${a.title}</strong></a>
       <div class="meta"><span class="source">${a.source}</span></div>
-      ${renderSentiment(a.sentiment)}
+      ${renderSentiment(a.sentiment, a.tooltip)}
     </div>
   `).join("");
 }
 
-// ---------- UI: center aggregated clusters ----------
-function renderClusterNews(){
-  const list = state.clusters.slice(0, 12);
-  $("#newsList").innerHTML = list.map(t => {
-    const s = { posP: t.sentiment.pos, neuP: t.sentiment.neu, negP: t.sentiment.neg };
-    const sources = typeof t.sources === "number" ? t.sources : t.count; // fallback
-    return `
-      <div class="cluster">
-        <div class="title">${t.title}</div>
-        ${renderSentiment(s)}
-        <div class="meta">${t.count} articles · ${sources} sources</div>
+// News list (center)
+function renderNewsList(){
+  const list = state.articles.slice(1, 10); // first goes to hero
+  $("#newsList").innerHTML = list.map(a => `
+    <a class="news-item" href="${a.link}" target="_blank" rel="noopener">
+      <img class="thumb" src="${a.image}" alt="">
+      <div>
+        <div class="title">${a.title}</div>
+        <div class="meta"><span class="source">${a.source}</span> · <span>${new Date(a.publishedAt).toLocaleString()}</span></div>
+        ${renderSentiment(a.sentiment, a.tooltip)}
       </div>
-    `;
-  }).join("");
+    </a>
+  `).join("");
 }
 
-// ---------- UI: right daily ----------
+// Daily (right)
 function renderDaily(){
-  const daily = pickTop(state.articles.slice(6), 8);
+  const daily = pickTop(state.articles.slice(10), 8);
   $("#daily").innerHTML = daily.map(a => `
     <a class="daily-item" href="${a.link}" target="_blank" rel="noopener">
       <img src="${a.image}" alt="">
       <div>
         <div><strong>${a.title}</strong></div>
         <div class="meta"><span class="source">${a.source}</span></div>
-        ${renderSentiment(a.sentiment)}
+        ${renderSentiment(a.sentiment, a.tooltip)}
       </div>
     </a>
   `).join("");
 }
 
-// ---------- UI: hero ----------
-function renderMainHero(){
-  const hero = state.articles?.[0];
-  const el = $("#mainHero");
-  if (!el) return;
-  if (!hero){
-    el.innerHTML = "";
-    return;
-  }
-  el.innerHTML = `
+// Hero (first article)
+function renderMainHero() {
+  const hero = state.articles.length ? state.articles[0] : null;
+  const container = document.getElementById("mainHero");
+  if (!container) return;
+  if (!hero) { container.innerHTML = ""; return; }
+  container.innerHTML = `
     <div class="hero-img"><img src="${hero.image}" alt=""></div>
     <div class="hero-content">
       <h3>${hero.title}</h3>
       <a href="${hero.link}" target="_blank" class="analysis-link">Read Analysis</a>
-      ${renderSentiment(hero.sentiment)}
+      ${renderSentiment(hero.sentiment, hero.tooltip)}
       <div class="meta"><span class="source">${hero.source}</span> · <span>${new Date(hero.publishedAt).toLocaleString()}</span></div>
     </div>
   `;
 }
 
-// ---------- Init ----------
+// Init
 loadAll();
 setInterval(loadAll, 1000 * 60 * 5);
+
 applyTheme();
-$("#themeToggle")?.addEventListener("click", toggleTheme);
+const themeBtn = document.getElementById("themeToggle");
+if (themeBtn) themeBtn.addEventListener("click", toggleTheme);
