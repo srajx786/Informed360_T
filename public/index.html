@@ -10,7 +10,6 @@
   <header class="topbar">
     <div class="brand">Informed360</div>
     <div id="ticker" class="ticker" aria-live="polite"></div>
-    <!-- Theme toggle button (sun/moon icon set via JS) -->
     <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme"></button>
   </header>
 
@@ -21,15 +20,11 @@
     </aside>
 
     <section class="center">
-      <!-- Highlighted hero story (from the latest article) -->
       <div id="mainHero" class="main-hero"></div>
-      <!-- Trending News section: displays aggregated clusters of stories based on common phrases.
-           Each cluster shows the headline, an overall sentiment bar, the number of
-           matching articles and an image from the first story. A horizontal
-           scroller lets users navigate through the top clusters. -->
+      <!-- News section -->
       <div class="trending-news-section">
-        <h2>Trending News</h2>
-        <div class="topics-carousel" id="topicsCarousel" role="region" aria-label="Trending topics">
+        <h2>News</h2>
+        <div class="topics-carousel" id="topicsCarousel" role="region" aria-label="News">
           <button class="nav prev" id="topicPrev" aria-label="Previous">‹</button>
           <div class="topic-slides" id="topicSlides"></div>
           <button class="nav next" id="topicNext" aria-label="Next">›</button>
@@ -38,9 +33,6 @@
     </section>
 
     <aside class="right">
-      <h2>Trending Topics</h2>
-      <div id="trending" class="trend-list"></div>
-
       <div class="daily">
         <h3>Daily News</h3>
         <div id="daily" class="daily-list"></div>
