@@ -1,0 +1,93 @@
+# -----------------------------
+# ChatGPT Ignore File
+# -----------------------------
+# This file tells the ChatGPT connector which files to SKIP while indexing.
+# It works like .gitignore, but ONLY affects the ChatGPT indexer.
+
+# -----------------------------
+# Build and dependency folders
+# -----------------------------
+node_modules/
+dist/
+build/
+.out/
+.next/
+target/
+.gradle/
+.cache/
+
+# -----------------------------
+# Git / VCS
+# -----------------------------
+.git/
+.gitignore
+.gitattributes
+
+# -----------------------------
+# Python environment
+# -----------------------------
+__pycache__/
+*.py[cod]
+*.egg
+*.egg-info/
+.eggs/
+.venv/
+env/
+venv/
+Pipfile.lock
+poetry.lock
+
+# -----------------------------
+# Package manager lockfiles
+# -----------------------------
+yarn.lock
+package-lock.json
+pnpm-lock.yaml
+
+# -----------------------------
+# IDE/editor junk
+# -----------------------------
+.vscode/
+.idea/
+*.iml
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# -----------------------------
+# Large/binary files
+# -----------------------------
+*.bin
+*.exe
+*.dll
+*.so
+*.dylib
+*.zip
+*.tar
+*.gz
+*.7z
+*.iso
+*.img
+*.pdf
+*.csv
+*.sqlite
+*.db
+*.mp4
+*.mp3
+*.wav
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.svg
+*.ico
+*.webp
+
+# -----------------------------
+# OS junk
+# -----------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
