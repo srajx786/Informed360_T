@@ -5,6 +5,7 @@
   --muted:#9aa4ad;
   --card:#161a1f;
   --border:#232a31;
+  /* Sentiment colors (match screenshot 2) */
   --green:#2ecc71; /* positive */
   --grey:#bdc3c7;  /* neutral  */
   --red:#ff4c4c;   /* negative */
@@ -84,7 +85,7 @@ img{
   background:#2563eb; color:#fff; font-size:.85rem; font-weight:600; text-align:center; width:max-content;
 }
 
-/* NEW — Clean News list */
+/* Clean News list (center) */
 .news-section{ margin-top:1rem; }
 .news-list{ display:flex; flex-direction:column; gap:.75rem; }
 .news-item{
@@ -95,4 +96,57 @@ img{
   width:96px; height:72px; border-radius:8px; object-fit:cover; background:#111;
 }
 .news-item .title{
-  font-weight:700; line-height
+  font-weight:800; line-height:1.25;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.news-item .meta{ color:var(--muted); font-size:.85rem; display:flex; gap:.5rem; align-items:center; }
+
+/* Daily (right) */
+.daily-list{ display:flex; flex-direction:column; gap:.75rem; margin-top:.5rem; }
+.daily-item{
+  display:grid; grid-template-columns:64px 1fr; gap:.75rem; align-items:center;
+  background:var(--card); border:1px solid var(--border); padding:.5rem; border-radius:12px;
+}
+
+/* Sentiment bar component — matches screenshot 2 */
+.sentiment{
+  display:flex;
+  flex-direction:column;
+  gap:.25rem;
+}
+.bar{
+  height:10px;
+  border-radius:999px;
+  overflow:hidden;
+  background:#222;
+  border:1px solid var(--border);
+}
+.segment{ height:100%; float:left; }
+.segment.pos{ background:var(--green); }
+.segment.neu{ background:var(--grey); }
+.segment.neg{ background:var(--red); }
+.scores{
+  display:flex;
+  justify-content:space-between;
+  font-size:.8rem;
+  color:var(--muted);
+}
+
+/* Tooltip for negative articles */
+.tooltip{ position:relative; }
+.tooltip[data-tip]:hover::after{
+  content:attr(data-tip);
+  position:absolute; left:0; top:125%;
+  background:#111; border:1px solid var(--border); color:var(--fg);
+  padding:.4rem .55rem; border-radius:8px; white-space:wrap; width:260px; z-index:3;
+}
+
+/* Footer */
+.footer{ padding:1rem; color:var(--muted); border-top:1px solid var(--border); margin-top:1rem; }
+
+/* Responsive */
+@media (max-width:1100px){
+  .layout{ grid-template-columns:1fr; }
+  .left,.right{ order:2; }
+  .center{ order:1; }
+}
