@@ -1,59 +1,136 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <title>Informed 360</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <link rel="stylesheet" href="styles.css"/>
+  <meta charset="utf-8" />
+  <title>Informed360 News</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <meta name="theme-color" content="#0d1116"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Public+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <!-- Top navigation bar -->
-  <header class="topbar">
-    <div class="brand">Informed 360</div>
-    <div id="ticker" class="ticker" aria-live="polite"></div>
-    <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme"></button>
+  <header class="gn-header">
+    <div class="gn-topbar">
+      <a class="gn-brand" href="/">
+        <img class="brand-image" src="/assets/informed360-logo.png" alt="Informed360" />
+      </a>
+
+      <div class="gn-search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 21l-4.2-4.2m1.7-5.3a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <input type="search" placeholder="Search for topics, locations & sources" aria-label="Search" />
+        <button class="icon-btn" id="themeToggle" title="Toggle theme">🌙</button>
+      </div>
+
+      <div style="display:flex; gap:.5rem; justify-content:flex-end">
+        <button class="icon-btn" title="Help">❓</button>
+        <button class="icon-btn" title="Settings">⚙️</button>
+        <div class="avatar" title="Profile">S</div>
+      </div>
+    </div>
+
+    <nav class="gn-tabs">
+      <button class="tab active" data-cat="home">Home</button>
+      <button class="tab" data-cat="foryou">For you</button>
+      <button class="tab" data-cat="following">Following</button>
+      <button class="tab" data-cat="showcase">News Showcase</button>
+      <span class="tab-divider"></span>
+      <button class="tab" data-cat="india">India</button>
+      <button class="tab" data-cat="world">World</button>
+      <button class="tab" data-cat="local">Local</button>
+      <button class="tab" data-cat="business">Business</button>
+      <button class="tab" data-cat="technology">Technology</button>
+      <button class="tab" data-cat="entertainment">Entertainment</button>
+      <button class="tab" data-cat="sports">Sports</button>
+      <button class="tab" data-cat="science">Science</button>
+      <button class="tab" data-cat="health">Health</button>
+    </nav>
   </header>
 
-  <!-- Main three‑column layout -->
-  <main class="layout">
-    <!-- Left column: pinned stories -->
-    <aside class="left">
-      <h2>Pinned News</h2>
-      <div id="pinned" class="card-list"></div>
-    </aside>
+  <!-- Briefing Row -->
+  <section class="gn-briefing">
+    <div>
+      <div class="display-title">YOUR BRIEFING</div>
+      <div class="briefing-date" id="briefingDate">—</div>
+    </div>
 
-    <!-- Centre column: hero and news list -->
-    <section class="center">
-      <!-- Featured story / hero panel -->
-      <div id="mainHero" class="main-hero"></div>
-      <!-- News list -->
-      <div class="news-section">
-        <h2>News</h2>
-        <div id="newsList" class="news-list"></div>
+    <!-- Mood + Market -->
+    <div class="ticker" id="tickerRow">
+      <!-- Nation's Mood appears first -->
+      <div id="moodTicker" class="mood-chip" title="Aggregate sentiment from currently loaded articles">
+        Nation’s Mood — Pos 0% · Neu 100% · Neg 0%
+      </div>
+      <!-- Market chips (you already render these) -->
+      <!-- Example placeholders; your server can still inject market values -->
+      <div class="market-chip">BSE Sensex <b id="bseVal">—</b> <span id="bseChg">—</span></div>
+      <div class="market-chip">NSE Nifty <b id="nseVal">—</b> <span id="nseChg">—</span></div>
+      <div class="market-chip">Gold <b id="goldVal">—</b> <span id="goldChg">—</span></div>
+      <div class="market-chip">USD/INR <b id="fxVal">—</b> <span id="fxChg">—</span></div>
+    </div>
+
+    <div class="weather-card">
+      <div style="font-size:22px">🌙</div>
+      <div>
+        <div class="briefing-date">Your area</div>
+        <div style="font-weight:800; font-size:1.2rem" id="wxNow">21°C</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Equal-height 3 columns -->
+  <main class="layout equal-row">
+    <!-- Left: PINNED (max 2) -->
+    <section class="left equal-col">
+      <div class="block-card stretch">
+        <div class="block-header">
+          <div class="block-title">PINNED</div>
+        </div>
+        <div class="block-list" id="pinned"></div>
+        <div class="block-footer">
+          <button class="link-btn" id="managePinsBtn">Manage Pins</button>
+        </div>
       </div>
     </section>
 
-    <!-- Right column: trending topics and daily feed -->
-    <aside class="right">
-      <!-- Trending topics cluster -->
-      <div class="topics">
-        <h3>Trending Topics</h3>
-        <div id="topicsList" class="topics-list"></div>
+    <!-- Center: HERO (4 carousel) -->
+    <section class="center equal-col">
+      <div class="hero-carousel stretch" id="hero">
+        <button class="hero-nav prev" id="heroPrev" aria-label="Previous">‹</button>
+        <div class="hero-track" id="heroTrack"></div>
+        <button class="hero-nav next" id="heroNext" aria-label="Next">›</button>
+        <div class="hero-dots" id="heroDots"></div>
       </div>
-      <!-- Daily feed list -->
-      <div class="daily">
-        <h3>Daily News</h3>
-        <div id="daily" class="daily-list"></div>
+    </section>
+
+    <!-- Right: Trending (max 3) + Leaderboard -->
+    <aside class="right equal-col">
+      <div class="block-card stretch">
+        <div class="block-header">
+          <div class="block-title">TRENDING TOPICS</div>
+        </div>
+        <div class="block-list" id="topicsList"></div>
+      </div>
+
+      <div class="block-card" id="leaderboardBlock">
+        <div class="block-header">
+          <div class="block-title">Sentiment Leaderboard</div>
+        </div>
+        <div class="leaderboard" id="leaderboard"></div>
       </div>
     </aside>
   </main>
 
-  <!-- Footer -->
+  <!-- Compact NEWS row (max 4) -->
+  <section class="news-compact">
+    <div class="section-title">NEWS</div>
+    <div class="news-four" id="newsFour"></div>
+  </section>
+
   <footer class="footer">
-    <span>© <span id="year"></span> Informed 360 — Indian news & sentiment for readers.</span>
+    © <span id="year">2025</span> Informed360 • Sentiment computed with VADER on headline + snippet
   </footer>
 
-  <!-- Client‑side logic -->
-  <script src="app.js" defer></script>
+  <script src="/app.js" defer></script>
 </body>
 </html>
