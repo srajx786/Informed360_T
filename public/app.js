@@ -1,229 +1,307 @@
-// Simple DOM query helpers
-const $ = (selector, root = document) => root.querySelector(selector);
-const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+/* ---------- helpers ---------- */
+const $  = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const fmtPct = n => `${Math.max(0, Math.min(100, Math.round(n || 0)))}%`;
+const todayStr = ()=> new Date().toLocaleDateString(undefined,{weekday:"long", day:"numeric", month:"long"});
+function domainFrom(url){ try{ return new URL(url).hostname.replace(/^www\./,''); }catch{ return ""; } }
 
-// Format a number to a 0–100 percentage string
-const fmtPct = (n) => `${Math.max(0, Math.min(100, Math.round(n)))}%`;
+/* ---------- state ---------- */
+function prefersDark(){ return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches; }
+const state = {
+  category: "home", filter: "all", experimental: false,
+  articles: [], pins: [], topics: [],
+  theme: localStorage.getItem("theme") || (prefersDark() ? "dark" : "light"),
+  hero: { index:0, timer:null, pause:false }
+};
 
-/**
- * Render a sentiment bar. Accepts absolute counts (pos, neu, neg)
- * or percentage keys (posP, neuP, negP). Displays all three percentages.
- */
-function renderSentiment(s, tip = "") {
-  let pos, neu, neg;
-  if (typeof s.posP === "number") {
-    pos = Math.max(0, Number(s.posP) || 0);
-    neu = Math.max(0, Number(s.neuP) || 0);
-    neg = Math.max(0, Number(s.negP) || 0);
-  } else {
-    const total = (s.pos || 0) + (s.neu || 0) + (s.neg || 0);
-    pos = total ? (s.pos / total) * 100 : 0;
-    neu = total ? (s.neu / total) * 100 : 0;
-    neg = total ? (s.neg / total) * 100 : 0;
-  }
-  const negTip = neg > 50 ? tip || "This cluster skews negative." : "";
+/* ---------- theme ---------- */
+function applyTheme(){
+  document.documentElement.setAttribute("data-theme", state.theme);
+  const t = $("#themeToggle"); if (t) t.textContent = state.theme === "dark" ? "🌞" : "🌙";
+}
+$("#themeToggle")?.addEventListener("click", ()=>{
+  state.theme = state.theme === "dark" ? "light" : "dark";
+  localStorage.setItem("theme", state.theme);
+  applyTheme();
+});
+
+/* ---------- sentiment UI ---------- */
+function renderSentiment(s, withNumbers=true){
+  const pos = s.posP ?? s.pos ?? 0;
+  const neu = s.neuP ?? s.neu ?? 0;
+  const neg = s.negP ?? s.neg ?? 0;
   return `
-    <div class="sentiment tooltip" ${negTip ? `data-tip="${negTip}"` : ""}>
+    <div class="sentiment">
       <div class="bar">
-        <span class="segment pos" style="width:${pos}%"></span>
-        <span class="segment neu" style="width:${neu}%"></span>
-        <span class="segment neg" style="width:${neg}%"></span>
+        <span class="segment pos" style="width:${fmtPct(pos)}"></span>
+        <span class="segment neu" style="width:${fmtPct(neu)}"></span>
+        <span class="segment neg" style="width:${fmtPct(neg)}"></span>
       </div>
+      ${withNumbers ? `
       <div class="scores">
         <span>Positive ${fmtPct(pos)}</span>
         <span>Neutral ${fmtPct(neu)}</span>
         <span>Negative ${fmtPct(neg)}</span>
-      </div>
-    </div>
-  `;
+      </div>` : ``}
+    </div>`;
 }
 
-// Global application state
-const state = {
-  articles: [],
-  pins: [],
-  topics: [],
-  theme: localStorage.getItem("theme") || "dark"
-};
-
-// Apply the current theme
-function applyTheme() {
-  document.documentElement.setAttribute("data-theme", state.theme);
-  const btn = $("#themeToggle");
-  if (btn) btn.textContent = state.theme === "light" ? "🌙" : "☀️";
+/* ---------- PINS (localStorage) ---------- */
+const PIN_KEY = "informed360.pinned";
+function loadPins(){
+  try{ state.pins = JSON.parse(localStorage.getItem(PIN_KEY)||"[]"); }catch{ state.pins = []; }
+}
+function savePins(){ localStorage.setItem(PIN_KEY, JSON.stringify(state.pins.slice(0,50))); }
+function isPinned(id){ return state.pins.some(p => p.id === id); }
+function togglePin(article){
+  const id = article.id || article.link;
+  if (isPinned(id)){
+    state.pins = state.pins.filter(p => p.id !== id);
+  } else {
+    state.pins.unshift({
+      id, title: article.title, link: article.link, image: article.image,
+      source: article.source, sourceIcon: article.sourceIcon, publishedAt: article.publishedAt,
+      sentiment: article.sentiment
+    });
+  }
+  savePins();
+  renderPinned(); // refresh left column immediately
 }
 
-// Toggle light/dark theme
-function toggleTheme() {
-  state.theme = state.theme === "light" ? "dark" : "light";
-  localStorage.setItem("theme", state.theme);
-  applyTheme();
-}
+/* ---------- data load ---------- */
+async function fetchJSON(u){ const r = await fetch(u); if(!r.ok) throw new Error(await r.text()); return r.json(); }
 
-// Fetch JSON helper
-async function fetchJSON(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
+async function loadAll(){
+  // Build /api/news params
+  const qs = new URLSearchParams();
+  if (state.filter !== "all") qs.set("sentiment", state.filter);
+  if (state.experimental) qs.set("experimental", "1");
+  if (state.category && !["home","foryou","local"].includes(state.category)) qs.set("category", state.category);
 
-// Load all data and render
-async function loadAll() {
-  const [news, pins, ticker, topics] = await Promise.all([
-    fetchJSON("/api/news"),
-    fetchJSON("/api/pinned"),
-    fetchJSON("/api/ticker").catch(() => ({ quotes: [] })),
-    fetchJSON("/api/topics").catch(() => ({ topics: [] }))
-  ]);
+  let news = { articles: [] }, topicsPayload = { topics: [] };
+  try { news = await fetchJSON(`/api/news${qs.toString() ? ("?"+qs.toString()) : ""}`); } catch(e){ console.warn("news err", e); }
+  try { topicsPayload = await fetchJSON(`/api/topics`); } catch(e){ console.warn("topics err", e); }
 
   state.articles = news.articles || [];
-  state.pins = pins.articles || [];
-  state.topics = (topics.topics || []).slice(0, 10);
 
-  renderTicker(ticker.quotes || []);
-  renderMainHero();
-  renderPinned();
-  renderNewsList();
-  renderDaily();
+  // 1) Mood ticker from *current* articles
+  renderMoodTicker(state.articles);
+
+  // 2) Hero + Compact news
+  renderHeroAndLists();
+
+  // 3) Trending topics (limit 3)
+  state.topics = (topicsPayload.topics || []).slice(0,3);
   renderTopics();
 
+  // 4) Leaderboard from *current* articles
+  renderLeaderboard(state.articles);
+
+  // housekeeping
+  $("#briefingDate").textContent = todayStr();
   $("#year").textContent = new Date().getFullYear();
-  applyTheme();
 }
 
-// Render ticker for Sensex, Nifty and NYSE
-function renderTicker(quotes) {
-  const indices = [
-    { symbol: "^BSESN", name: "BSE Sensex" },
-    { symbol: "^NSEI", name: "Nifty 50" },
-    { symbol: "^NYA", name: "NYSE Composite" }
-  ];
-  const line = indices
-    .map((info, idx) => {
-      const q = (quotes && quotes[idx]) || {};
-      const change = typeof q.change === "number" ? q.change : 0;
-      const price = typeof q.price === "number" ? q.price : null;
-      const changePct = typeof q.changePercent === "number" ? (q.changePercent * 100).toFixed(2) : null;
-      const cls = change >= 0 ? "up" : "down";
-      const priceStr = price != null ? price.toFixed(2) : "--";
-      const pctStr = changePct != null ? `${changePct}%` : "--";
-      return `<span>${info.name}: <span class="${cls}">${priceStr} (${pctStr})</span></span>`;
-    })
-    .join(" · ");
-  $("#ticker").innerHTML = line;
+/* ---------- Mood ---------- */
+function renderMoodTicker(articles){
+  if (!articles.length){ $("#moodTicker").textContent = "Nation’s Mood — Pos 0% · Neu 100% · Neg 0%"; return; }
+  const acc = {pos:0, neu:0, neg:0};
+  for (const a of articles){
+    acc.pos += a.sentiment?.pos || 0;
+    acc.neu += a.sentiment?.neu || 0;
+    acc.neg += a.sentiment?.neg || 0;
+  }
+  const n = articles.length;
+  const pos = Math.round(acc.pos/n), neu = Math.round(acc.neu/n), neg = Math.round(acc.neg/n);
+  $("#moodTicker").textContent = `Nation’s Mood — Positive ${pos}% · Neutral ${neu}% · Negative ${neg}%`;
 }
 
-// Helper to take first n items
-function pickTop(arr, n) {
-  return arr.slice(0, n);
-}
+/* ---------- Pinned (max 2) ---------- */
+function renderPinned(){
+  loadPins();
+  const host = $("#pinned");
+  const items = state.pins.slice(0,2);
+  if (!items.length){ host.innerHTML = `<div class="row"><div class="row-title">No pinned items yet. Use “Pin” on any story to track it here.</div></div>`; return; }
+  host.innerHTML = items.map(p => `
+    <div class="row">
+      <a class="row-title" href="${p.link}" target="_blank" rel="noopener">${p.title}</a>
+      <div class="row-meta">
+        <span class="source-chip"><img class="favicon" src="${p.sourceIcon || `https://logo.clearbit.com/${domainFrom(p.link)}`}"> ${p.source||domainFrom(p.link)}</span>
+        <span>·</span>
+        <span>${new Date(p.publishedAt).toLocaleString()}</span>
+      </div>
+      ${renderSentiment(p.sentiment, true)}
+      <div><button class="pin-btn" aria-pressed="true" data-unpin="${p.id}">Unpin</button></div>
+    </div>
+  `).join("");
 
-// Render pinned articles
-function renderPinned() {
-  const pins = state.pins.length ? state.pins : pickTop(state.articles, 3);
-  $("#pinned").innerHTML = pins
-    .map(
-      (a) => `
-        <div class="card">
-          <a href="${a.link}" target="_blank" rel="noopener"><strong>${a.title}</strong></a>
-          <div class="meta"><span class="source">${a.source}</span></div>
-          ${renderSentiment(a.sentiment, a.tooltip)}
+  // unpin handlers
+  $$('[data-unpin]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.pins = state.pins.filter(x=> x.id !== btn.dataset.unpin);
+      savePins(); renderPinned();
+    });
+  });
+}
+$("#managePinsBtn")?.addEventListener("click", ()=> alert("Pins are saved on this device. Use 'Pin' on any story to add it here, 'Unpin' to remove."));
+
+/* ---------- Hero + Compact News ---------- */
+function heroSlide(a){
+  const id = a.id || a.link;
+  return `
+    <article class="hero-slide">
+      <div class="hero-img"><img src="${a.image}" alt=""></div>
+      <div class="hero-content">
+        <h3>${a.title}</h3>
+        <a href="${a.link}" target="_blank" class="analysis-link" rel="noopener">Read Analysis</a>
+        ${renderSentiment(a.sentiment, true)}
+        <div class="row-meta">
+          <span class="source-chip"><img class="favicon" src="${a.sourceIcon || `https://logo.clearbit.com/${domainFrom(a.link)}`}"> ${a.source}</span>
+          <span>·</span>
+          <span>${new Date(a.publishedAt).toLocaleString()}</span>
         </div>
-      `
-    )
-    .join("");
+        <div><button class="pin-btn" aria-pressed="${isPinned(id)}" data-pin="${id}">${isPinned(id)?"Pinned":"Pin"}</button></div>
+      </div>
+    </article>`;
+}
+function cardCompact(a){
+  const id = a.id || a.link;
+  return `
+    <a class="news-card" href="${a.link}" target="_blank" rel="noopener">
+      <img class="thumb" src="${a.image}" alt="">
+      <div>
+        <div class="title">${a.title}</div>
+        <div class="row-meta">
+          <span class="source-chip"><img class="favicon" src="${a.sourceIcon || `https://logo.clearbit.com/${domainFrom(a.link)}`}"> ${a.source}</span>
+          <span>·</span>
+          <span>${new Date(a.publishedAt).toLocaleString()}</span>
+        </div>
+        ${renderSentiment(a.sentiment, true)}
+      </div>
+    </a>`;
+}
+function renderHeroAndLists(){
+  // HERO — first 4
+  const slides = state.articles.slice(0,4);
+  const track = $("#heroTrack");
+  const dots  = $("#heroDots");
+  if (!slides.length){ $("#hero").style.display="none"; } else {
+    $("#hero").style.display="";
+    track.innerHTML = slides.map(heroSlide).join("");
+    dots.innerHTML = slides.map((_,i)=>`<button data-i="${i}" aria-label="Go to slide ${i+1}"></button>`).join("");
+    updateHero(0);
+  }
+
+  // Pinned (left) refresh now
+  renderPinned();
+
+  // Compact News — next 4
+  $("#newsFour").innerHTML = state.articles.slice(4, 8).map(cardCompact).join("");
+
+  // bind pin buttons inside hero
+  $$('[data-pin]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.preventDefault(); e.stopPropagation();
+      const id = btn.dataset.pin;
+      const art = state.articles.find(x => (x.id||x.link) === id);
+      if (art){ togglePin(art); btn.setAttribute('aria-pressed', isPinned(id)); btn.textContent = isPinned(id) ? "Pinned" : "Pin"; }
+    });
+  });
 }
 
-// Render news list
-function renderNewsList() {
-  const list = state.articles.slice(1, 10);
-  $("#newsList").innerHTML = list
-    .map(
-      (a) => `
-        <a class="news-item" href="${a.link}" target="_blank" rel="noopener">
-          <img class="thumb" src="${a.image}" alt="">
-          <div>
-            <div class="title">${a.title}</div>
-            <div class="meta"><span class="source">${a.source}</span> · <span>${new Date(a.publishedAt).toLocaleString()}</span></div>
-            ${renderSentiment(a.sentiment, a.tooltip)}
-          </div>
-        </a>
-      `
-    )
-    .join("");
+/* ---------- Hero controls ---------- */
+function updateHero(i){
+  const n = $$("#heroTrack .hero-slide").length;
+  if (!n) return;
+  state.hero.index = (i+n)%n;
+  $("#heroTrack").style.transform = `translateX(-${state.hero.index*100}%)`;
+  $$("#heroDots button").forEach((b,bi)=> b.classList.toggle("active", bi===state.hero.index));
 }
+$("#heroPrev")?.addEventListener("click", ()=> updateHero(state.hero.index-1));
+$("#heroNext")?.addEventListener("click", ()=> updateHero(state.hero.index+1));
+$("#hero")?.addEventListener("mouseenter", ()=> state.hero.pause = true);
+$("#hero")?.addEventListener("mouseleave", ()=> state.hero.pause = false);
+function startHeroAuto(){ stopHeroAuto(); state.hero.timer = setInterval(()=>{ if(!state.hero.pause && window.matchMedia("(min-width:768px)").matches) updateHero(state.hero.index+1); }, 6000); }
+function stopHeroAuto(){ if(state.hero.timer){ clearInterval(state.hero.timer); state.hero.timer=null; } }
 
-// Render daily feed
-function renderDaily() {
-  const daily = pickTop(state.articles.slice(10), 8);
-  $("#daily").innerHTML = daily
-    .map(
-      (a) => `
-        <a class="daily-item" href="${a.link}" target="_blank" rel="noopener">
-          <img src="${a.image}" alt="">
-          <div>
-            <div><strong>${a.title}</strong></div>
-            <div class="meta"><span class="source">${a.source}</span></div>
-            ${renderSentiment(a.sentiment, a.tooltip)}
-          </div>
-        </a>
-      `
-    )
-    .join("");
-}
-
-// Render main hero story
-function renderMainHero() {
-  const hero = state.articles.length ? state.articles[0] : null;
-  const container = $("#mainHero");
-  if (!container) return;
-  if (!hero) {
-    container.innerHTML = "";
+/* ---------- Trending (limit 3 already sliced in loadAll) ---------- */
+function renderTopics(){
+  const el = $("#topicsList");
+  if (!state.topics || !state.topics.length){
+    el.innerHTML = `<div class="row"><div class="row-title">No trending topics yet</div></div>`;
     return;
   }
-  container.innerHTML = `
-    <div class="hero-img"><img src="${hero.image}" alt=""></div>
-    <div class="hero-content">
-      <h3>${hero.title}</h3>
-      <a href="${hero.link}" target="_blank" class="analysis-link">Read Analysis</a>
-      ${renderSentiment(hero.sentiment, hero.tooltip)}
-      <div class="meta"><span class="source">${hero.source}</span> · <span>${new Date(hero.publishedAt).toLocaleString()}</span></div>
-    </div>
-  `;
-}
-
-// Render trending topics
-function renderTopics() {
-  const list = state.topics;
-  const container = $("#topicsList");
-  if (!container) return;
-  container.innerHTML = list
-    .map((topic) => {
-      const title = topic.title.split("|")[0].trim();
-      const s = topic.sentiment || { pos: 0, neg: 0, neu: 0 };
-      const total = s.pos + s.neg + s.neu;
-      const sent = {
-        posP: total ? (s.pos / total) * 100 : 0,
-        neuP: total ? (s.neu / total) * 100 : 0,
-        negP: total ? (s.neg / total) * 100 : 0
-      };
-      return `
-        <div class="topic-item">
-          <div class="topic-header"><strong>${title}</strong></div>
-          <div class="topic-meta">
-            <span>${topic.count} articles</span>
-            <span>${topic.sources} sources</span>
-          </div>
-          ${renderSentiment(sent)}
+  el.innerHTML = state.topics.map(t=>{
+    const icons = (t.icons||[]).slice(0,4).map(ic=>`<img class="favicon" src="${ic}" alt="">`).join("");
+    return `
+      <div class="row">
+        <div class="row-title">${t.title}</div>
+        <div class="row-meta">
+          <span>${t.count||0} articles</span> · <span>${t.sources||0} sources</span> <span class="row-icons">${icons}</span>
         </div>
-      `;
-    })
-    .join("");
+        ${renderSentiment({ pos:t.sentiment?.pos||0, neu:t.sentiment?.neu||0, neg:t.sentiment?.neg||0 }, true)}
+      </div>
+    `;
+  }).join("");
 }
 
-// Initialise
-loadAll();
-setInterval(loadAll, 1000 * 60 * 5); // refresh every 5 minutes
+/* ---------- Leaderboard (from current articles) ---------- */
+function renderLeaderboard(articles){
+  // group by domain (or provided source)
+  const groups = new Map();
+  for (const a of articles){
+    const key = (a.source && a.source.toLowerCase()) || domainFrom(a.link) || "source";
+    const g = groups.get(key) || { domain:key, icon: a.sourceIcon || `https://logo.clearbit.com/${domainFrom(a.link)}`, pos:0, neu:0, neg:0, n:0 };
+    g.pos += a.sentiment?.pos || 0;
+    g.neu += a.sentiment?.neu || 0;
+    g.neg += a.sentiment?.neg || 0;
+    g.n += 1;
+    groups.set(key, g);
+  }
+  const rows = [...groups.values()]
+    .filter(g=> g.n >= 2)                   // at least 2 articles
+    .map(g => ({ ...g, pos:Math.round(g.pos/g.n), neu:Math.round(g.neu/g.n), neg:Math.round(g.neg/g.n)}))
+    .sort((a,b) => b.n - a.n)               // most coverage first
+    .slice(0,6);
+
+  if (!rows.length){ $("#leaderboard").innerHTML = `<div class="lb-row">Insufficient data</div>`; return; }
+
+  $("#leaderboard").innerHTML = rows.map(r => `
+    <div class="lb-row">
+      <div class="lb-brand"><img class="favicon" src="${r.icon}" alt=""> ${r.domain}</div>
+      <div class="lb-bar">
+        <span class="lb-pos" style="width:${fmtPct(r.pos)}"></span>
+        <span class="lb-neu" style="width:${fmtPct(r.neu)}"></span>
+        <span class="lb-neg" style="width:${fmtPct(r.neg)}"></span>
+      </div>
+    </div>
+  `).join("");
+}
+
+/* ---------- controls ---------- */
+$$(".chip[data-sent]").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    $$(".chip[data-sent]").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    state.filter = btn.dataset.sent; loadAll();
+  });
+});
+$("#expChip")?.addEventListener("click", ()=>{
+  state.experimental = !state.experimental;
+  $("#expChip").classList.toggle("active", state.experimental);
+  loadAll();
+});
+$$(".gn-tabs .tab[data-cat]").forEach(tab=>{
+  tab.addEventListener("click", ()=>{
+    $$(".gn-tabs .tab").forEach(t=>t.classList.remove("active"));
+    tab.classList.add("active");
+    state.category = tab.dataset.cat; loadAll();
+  });
+});
+
+/* ---------- boot ---------- */
 applyTheme();
-const themeBtn = $("#themeToggle");
-if (themeBtn) themeBtn.addEventListener("click", toggleTheme);
+loadPins();
+$("#briefingDate").textContent = todayStr();
+loadAll();
+startHeroAuto();
