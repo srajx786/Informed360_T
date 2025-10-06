@@ -1,35 +1,147 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover"
-    />
-    <title>Informed360 • Sentiment Leaderboard</title>
-    <link rel="stylesheet" href="/styles.css" />
-  </head>
-  <body>
-    <header class="topbar">
-      <div class="brand">Informed360</div>
-    </header>
+<head>
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Informed360 — News</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <!-- Chart.js for split-bar -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <!-- Dayjs for any local time formatting already used -->
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js" defer></script>
+</head>
 
-    <main class="container">
-      <!-- Other columns/cards of your homepage would live here -->
+<body>
+  <!-- ===== Top Nav (unchanged except logo text shows “Informed360 / News”) ===== -->
+  <header class="topnav">
+    <div class="brand">
+      <div class="brand-main">INFORMED360</div>
+      <div class="brand-sub">News</div>
+    </div>
 
-      <section id="leaderboard-card" class="card">
-        <div class="card-header">
-          <h3>Sentiment Leaderboard</h3>
+    <div class="search-wrap">
+      <input id="searchInput"
+             class="search-input"
+             placeholder="Search for topics, locations & sources" />
+      <button id="searchExpand" class="search-expand">▾</button>
+    </div>
+
+    <div class="top-actions">
+      <button class="top-icon" id="helpBtn">?</button>
+      <button class="top-icon" id="settingsBtn">⚙️</button>
+      <button class="top-avatar" id="profileBtn">S</button>
+    </div>
+  </header>
+
+  <!-- ===== Primary Nav (unchanged) ===== -->
+  <nav class="primary-nav">
+    <a class="active" href="/">Home</a>
+    <a href="/foryou">For you</a>
+    <a href="/following">Following</a>
+    <a href="/showcase">News Showcase</a>
+    <a href="/india">India</a>
+    <a href="/world">World</a>
+    <a href="/local">Local</a>
+    <a href="/business">Business</a>
+    <a href="/tech">Technology</a>
+    <a href="/entertainment">Entertainment</a>
+    <a href="/sports">Sports</a>
+    <a href="/science">Science</a>
+    <a href="/health">Health</a>
+  </nav>
+
+  <main class="container">
+    <h1 class="page-kicker">YOUR BRIEFING</h1>
+    <div id="briefingDate" class="page-sub"></div>
+
+    <!-- =========================================================
+         NEW: Top stripe wrapper
+         Row 1: Mood pill + Weather pill (moved up)
+         Row 2: Market tickers (unchanged content; we render into #marketsRow)
+         Row 3: Split-bar (4h trend)
+         ========================================================= -->
+    <section class="top-stripe">
+      <!-- Row 1 -->
+      <div class="top-row">
+        <div id="moodTickerPill" class="pill mood-pill">
+          <!-- Filled by app.js -->
         </div>
-        <div class="card-body">
-          <canvas id="leaderboardChart" height="180"></canvas>
+
+        <div id="weatherPill" class="pill weather-pill">
+          <!-- Filled by app.js (existing weather code now targets this) -->
         </div>
+      </div>
+
+      <!-- Row 2 -->
+      <div class="markets-row" id="marketsRow">
+        <!-- Filled by app.js with BSE, NSE, Gold, USD/INR etc. -->
+      </div>
+
+      <!-- Row 3 -->
+      <div class="mood-splitbar-row card">
+        <div class="splitbar-header">
+          <div class="splitbar-title">Nation’s Mood — 4-hour Trend</div>
+          <div class="splitbar-legend">
+            <span class="legend-chip legend-pos">Positive</span>
+            <span class="legend-chip legend-neg">Negative</span>
+          </div>
+        </div>
+        <div class="splitbar-body">
+          <canvas id="moodSplitBar" height="90"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Main 3-column layout (unchanged) ===== -->
+    <div class="grid">
+      <!-- Left: Pinned -->
+      <aside class="col pinned">
+        <section class="card">
+          <h2 class="card-title">Pinned</h2>
+          <div id="pinnedList" class="stack"></div>
+        </section>
+      </aside>
+
+      <!-- Center: Hero + News -->
+      <section class="col center">
+        <section class="card hero" id="heroCard">
+          <!-- Filled by app.js (hero carousel) -->
+        </section>
+
+        <section class="news card">
+          <h2 class="card-title">News</h2>
+          <div class="news-filter">
+            <button class="chip active" data-filter="all">All</button>
+            <button class="chip" data-filter="positive">Positive</button>
+            <button class="chip" data-filter="neutral">Neutral</button>
+            <button class="chip" data-filter="negative">Negative</button>
+            <button class="chip" data-filter="maxfeeds">Max Feeds</button>
+          </div>
+          <div id="newsList" class="stack"></div>
+        </section>
       </section>
-    </main>
 
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <!-- App -->
-    <script src="/app.js"></script>
-  </body>
+      <!-- Right: Trending + Leaderboard -->
+      <aside class="col right">
+        <section class="card">
+          <h2 class="card-title">Trending Topics</h2>
+          <div id="trendingList" class="stack"></div>
+        </section>
+
+        <section class="card">
+          <h2 class="card-title">Sentiment Leaderboard</h2>
+          <div id="leaderboard" class="leaderboard"></div>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <script src="/app.js" defer></script>
+</body>
 </html>
