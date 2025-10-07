@@ -1,77 +1,97 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Informed360 News</title>
-    <link rel="stylesheet" href="styles.css" />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  </head>
-  <body>
-    <header>
-      <h1><span class="logo">INFORMED360</span> <small>News</small></h1>
-      <div class="search-bar">
-        <input type="text" placeholder="Search for topics, locations & sources" />
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+  <title>Informed360 • News</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-title">INFORMED360</div>
+      <div class="brand-sub">News</div>
+    </div>
+    <div class="search">
+      <input type="search" placeholder="Search for topics, locations & sources">
+    </div>
+    <div class="actions">
+      <button class="icon-btn">?</button>
+      <button class="icon-btn">⚙️</button>
+      <div class="avatar">S</div>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <a class="tab active">Home</a>
+    <a class="tab">For you</a>
+    <a class="tab">Following</a>
+    <a class="tab">News Showcase</a>
+    <a class="tab">India</a><a class="tab">World</a><a class="tab">Local</a>
+    <a class="tab">Business</a><a class="tab">Technology</a><a class="tab">Entertainment</a>
+    <a class="tab">Sports</a><a class="tab">Science</a><a class="tab">Health</a>
+  </nav>
+
+  <main class="container">
+    <h1 class="page-title">Your Briefing</h1>
+
+    <!-- Mood + Weather -->
+    <section class="row mood-weather">
+      <div class="pill" id="moodTicker">
+        Nation’s Mood — <span id="moodPos" class="mood positive">Positive 0%</span>
+        <span class="dot">·</span>
+        <span id="moodNeu" class="mood neutral">Neutral 0%</span>
+        <span class="dot">·</span>
+        <span id="moodNeg" class="mood negative">Negative 0%</span>
       </div>
-      <div class="weather-box">🌤️ <span id="weather">Your area</span></div>
-    </header>
+      <div class="weather pill"><span>⛅</span><div><div class="w-title">Your area</div><div id="weatherTemp" class="w-temp">21°C</div></div></div>
+    </section>
 
-    <nav>
-      <ul>
-        <li>Home</li>
-        <li>For you</li>
-        <li>Following</li>
-        <li>News Showcase</li>
-        <li>India</li>
-        <li>World</li>
-        <li>Local</li>
-        <li>Business</li>
-        <li>Technology</li>
-        <li>Entertainment</li>
-        <li>Sports</li>
-        <li>Science</li>
-        <li>Health</li>
-      </ul>
-    </nav>
+    <!-- 4-hour split bar -->
+    <section class="card mood-split">
+      <div class="card-head">
+        <h2>Nation’s Mood — 4-hour Trend</h2>
+        <div class="legend"><span class="legend-chip pos">Positive</span><span class="legend-chip neg">Negative</span></div>
+      </div>
+      <canvas id="moodTrend" height="90"></canvas>
+    </section>
 
-    <main>
-      <section class="briefing">
-        <h2>Your Briefing</h2>
-        <div id="mood-ticker" class="mood-ticker">Nation’s Mood — Loading...</div>
-        <div class="ticker-row">
-          <div class="market-ticker">
-            <span>BSE Sensex ▲ 81,790.12 (0.72%)</span>
-            <span>NSE Nifty ▲ 25,077.65 (0.74%)</span>
-            <span>Gold ▲ 3,983 (1.9%)</span>
-          </div>
+    <!-- Pinned | Hero | Trending -->
+    <section class="grid-briefing">
+      <div class="col">
+        <h3 class="col-title">Pinned</h3>
+        <div id="pinnedStack" class="stack"></div>
+      </div>
+
+      <div class="col hero">
+        <div id="heroCarousel" class="carousel"></div>
+        <div id="heroDots" class="dots"></div>
+      </div>
+
+      <div class="col">
+        <h3 class="col-title">Trending Topics</h3>
+        <div id="trendingList" class="stack"></div>
+      </div>
+    </section>
+
+    <!-- News + Leaderboard -->
+    <section class="grid-news">
+      <div class="news-feed">
+        <div class="chips">
+          <button class="chip active" data-filter="all">All</button>
+          <button class="chip" data-filter="positive">Positive</button>
+          <button class="chip" data-filter="neutral">Neutral</button>
+          <button class="chip" data-filter="negative">Negative</button>
         </div>
+        <div id="newsList" class="stack"></div>
+      </div>
+      <aside class="leaderboard card">
+        <h3 class="col-title">Sentiment Leaderboard</h3>
+        <div id="leaderboard" class="leaderboard-list"></div>
+      </aside>
+    </section>
+  </main>
 
-        <div class="mood-trend">
-          <h3>Nation’s Mood — 4-hour Trend</h3>
-          <canvas id="moodChart" height="100"></canvas>
-        </div>
-
-        <div class="grid">
-          <div class="pinned">
-            <h3>Pinned</h3>
-            <div id="pinned"></div>
-          </div>
-
-          <div class="hero">
-            <h3>Top News</h3>
-            <div id="hero"></div>
-          </div>
-
-          <div class="trending">
-            <h3>Trending Topics</h3>
-            <div id="trending"></div>
-            <h3>Sentiment Leaderboard</h3>
-            <div id="leaderboard"></div>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <script src="app.js"></script>
-  </body>
+  <script type="module" src="app.js"></script>
+</body>
 </html>
