@@ -1,101 +1,157 @@
-async function loadNews() {
-  const res = await fetch("/api/news");
-  const { articles } = await res.json();
+// Client – real 4-hour chart + leaderboard + cards
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s,r)];
+const jget = (u, f={}) => fetch(u).then(r=>r.json()).catch(()=>f);
 
-  const heroDiv = document.getElementById("hero");
-  const pinnedDiv = document.getElementById("pinned");
-  const trendingDiv = document.getElementById("trending");
+const moodPos=$("#moodPos"), moodNeu=$("#moodNeu"), moodNeg=$("#moodNeg");
+const moodTrendCanvas=$("#moodTrend");
+const pinnedStack=$("#pinnedStack"), trendingList=$("#trendingList");
+const heroCarousel=$("#heroCarousel"), heroDots=$("#heroDots");
+const newsList=$("#newsList"), leaderboard=$("#leaderboard");
 
-  heroDiv.innerHTML = "";
-  pinnedDiv.innerHTML = "";
-  trendingDiv.innerHTML = "";
+const toPct = (n)=>`${Math.round(n)}%`;
+const bar = (p,n,e)=>`
+  <div class="bar">
+    <span class="pos" style="width:${p}%"></span>
+    <span class="neu" style="width:${n}%"></span>
+    <span class="neg" style="width:${e}%"></span>
+  </div>`;
 
-  // Pinned = top 2
-  articles.slice(0, 2).forEach((a) => {
-    pinnedDiv.innerHTML += `
-      <div class="card pinned-card">
-        <h4>${a.title}</h4>
-        <p>${a.source}</p>
-        <div class="sentiment-bar ${a.sentiment}">${a.sentiment}</div>
-      </div>`;
+function drawSplit(buckets){
+  const ctx = moodTrendCanvas.getContext("2d");
+  const W = moodTrendCanvas.width = moodTrendCanvas.clientWidth;
+  const H = moodTrendCanvas.height = 90;
+  ctx.clearRect(0,0,W,H);
+  if(!buckets.length) return;
+  const step = W / buckets.length;
+  buckets.forEach((b,i)=>{
+    const x = i*step + step*0.25;
+    const w = step*0.5;
+    // top green
+    const gh = (b.positive/100)*36;
+    ctx.fillStyle = "#15b36d";
+    ctx.fillRect(x, 10 + (36-gh), w, gh);
+    // bottom red
+    const rh = (b.negative/100)*36;
+    ctx.fillStyle = "#e64c3c";
+    ctx.fillRect(x, 54, w, rh);
   });
-
-  // Hero = top 4
-  articles.slice(0, 4).forEach((a) => {
-    heroDiv.innerHTML += `
-      <div class="card hero-card">
-        <h4>${a.title}</h4>
-        <p>${a.source}</p>
-        <a href="${a.link}" target="_blank" class="read">Read Analysis</a>
-        <div class="sentiment-bar ${a.sentiment}">${a.sentiment}</div>
-      </div>`;
-  });
-
-  // Trending = 3 random
-  articles
-    .sort(() => 0.5 - Math.random())
-    .slice(0, 3)
-    .forEach((a) => {
-      trendingDiv.innerHTML += `
-      <div class="card trend-card">
-        <h4>${a.title}</h4>
-        <p>${a.source}</p>
-        <div class="sentiment-bar ${a.sentiment}">${a.sentiment}</div>
-      </div>`;
-    });
 }
 
-async function loadMood() {
-  const res = await fetch("/api/mood");
-  const data = await res.json();
-  const el = document.getElementById("mood-ticker");
-  el.innerHTML = `
-  Nation’s Mood — 
-  <span class="pos">Positive ${data.positive}%</span> • 
-  <span class="neu">Neutral ${data.neutral}%</span> • 
-  <span class="neg">Negative ${data.negative}%</span>
+function smallCard(it){
+  const p = it.sentiment.label==="positive"?100:0;
+  const n = it.sentiment.label==="neutral"?100:0;
+  const e = it.sentiment.label==="negative"?100:0;
+  return `
+    <article class="story-card">
+      <div class="story-title">${it.title}</div>
+      <div class="story-meta">${it.source} · ${new Date(it.publishedAt).toLocaleString()}</div>
+      ${bar(p,n,e)}
+      <div class="story-meta"><a href="${it.link}" target="_blank" rel="noopener">Read</a></div>
+    </article>`;
+}
+
+function heroCard(it){
+  const p = it.sentiment.label==="positive"?100:0;
+  const n = it.sentiment.label==="neutral"?100:0;
+  const e = it.sentiment.label==="negative"?100:0;
+  return `
+    <div class="media"></div>
+    <h4 class="story-title">${it.title}</h4>
+    ${bar(p,n,e)}
+    <div class="story-meta">${it.source} · ${new Date(it.publishedAt).toLocaleString()}</div>
+    <a class="cta" href="${it.link}" target="_blank" rel="noopener">Read Analysis</a>
   `;
-  updateMoodChart(data);
 }
 
-function updateMoodChart(data) {
-  const ctx = document.getElementById("moodChart").getContext("2d");
-  new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels: ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "24:00"],
-      datasets: [
-        {
-          label: "Positive",
-          data: [10, 9, 11, 9, 10, 11, 11],
-          backgroundColor: "#1DB954",
-        },
-        {
-          label: "Negative",
-          data: [-10, -9, -10, -8, -9, -10, -9],
-          backgroundColor: "#E63946",
-        },
-      ],
-    },
-    options: {
-      plugins: {
-        legend: { position: "top" },
-      },
-      scales: {
-        y: {
-          min: -20,
-          max: 20,
-          ticks: {
-            callback: function (value) {
-              return Math.abs(value) + "%";
-            },
-          },
-        },
-      },
-    },
+let heroIdx=0, heroItems=[];
+function paintHero(){
+  if(!heroItems.length){ heroCarousel.innerHTML = `<div style="height:390px"></div>`; return;}
+  heroIdx = (heroIdx+heroItems.length)%heroItems.length;
+  heroCarousel.innerHTML = heroCard(heroItems[heroIdx]);
+  heroDots.innerHTML = heroItems.map((_,i)=>`<span class="dot-pt ${i===heroIdx?'active':''}"></span>`).join("");
+}
+
+function paintTrending(rows){
+  trendingList.innerHTML = rows.map(r=>`
+    <article class="story-card">
+      <div class="story-title">${r.topic}</div>
+      ${bar(r.positive, r.neutral, r.negative)}
+      <div class="story-meta">${r.articles} articles · ${r.sources} sources</div>
+    </article>`).join("");
+}
+
+function paintNews(items){
+  const tpl = it => {
+    const p = it.sentiment.label==="positive"?100:0;
+    const n = it.sentiment.label==="neutral"?100:0;
+    const e = it.sentiment.label==="negative"?100:0;
+    return `
+      <article class="story-card">
+        <div class="story-title">${it.title}</div>
+        <div class="story-meta">${it.source} · ${new Date(it.publishedAt).toLocaleString()}</div>
+        ${bar(p,n,e)}
+        <div class="story-meta"><a href="${it.link}" target="_blank" rel="noopener">Open</a></div>
+      </article>`;
+  };
+  newsList.innerHTML = items.slice(0,12).map(tpl).join("");
+}
+
+function paintPinned(items){
+  pinnedStack.innerHTML = items.slice(0,2).map(smallCard).join("");
+}
+
+function paintLeaderboard(rows){
+  const chunks=[]; for(let i=0;i<rows.length;i+=4) chunks.push(rows.slice(i,i+4));
+  leaderboard.innerHTML = chunks.map(c=>`
+    <div class="lb-row">
+      ${c.map(r=>`
+        <div class="lb-cell">
+          <div class="lb-stack">
+            <div class="lb-pos" style="height:${r.positive}%"></div>
+            <div class="lb-neu" style="height:${r.neutral}%; bottom:${r.positive}%"></div>
+            <div class="lb-neg" style="height:${r.negative}%"></div>
+          </div>
+          <div class="lb-pct">${r.positive}% / ${r.neutral}% / ${r.negative}%</div>
+          <div class="lb-count">${r.source} · ${r.count}</div>
+        </div>`).join("")}
+    </div>`).join("");
+}
+
+async function hydrate(){
+  // mood & 4-hour trend
+  const mood = await jget("/api/mood",{positive:0,neutral:0,negative:0,count:0});
+  moodPos.textContent = `Positive ${toPct(mood.positive)}`;
+  moodNeu.textContent = `Neutral ${toPct(mood.neutral)}`;
+  moodNeg.textContent = `Negative ${toPct(mood.negative)}`;
+
+  const trend = await jget("/api/mood-trend",{buckets:[]});
+  drawSplit(trend.buckets||[]);
+
+  // news, trending, leaderboard
+  const [{items},{rows:trendRows},{rows:lbRows}] = await Promise.all([
+    jget("/api/news",{items:[]}),
+    jget("/api/trending",{rows:[]}),
+    jget("/api/leaderboard",{rows:[]})
+  ]);
+
+  const list = items;
+  heroItems = list.slice(0,4); paintHero(); setInterval(()=>{heroIdx++;paintHero();},6000);
+  paintPinned(list);
+  paintTrending(trendRows||[]);
+  paintNews(list);
+  paintLeaderboard(lbRows||[]);
+
+  // filters
+  $$(".chip[data-filter]").forEach(btn=>{
+    btn.onclick = ()=>{
+      $$(".chip[data-filter]").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      const f = btn.dataset.filter;
+      const out = f==="all" ? list : list.filter(x=>x.sentiment.label===f);
+      paintNews(out);
+    };
   });
 }
 
-loadNews();
-loadMood();
-setInterval(loadMood, 1000 * 60 * 10); // refresh every 10 minutes
+hydrate();
