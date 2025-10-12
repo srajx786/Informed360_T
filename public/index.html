@@ -1,97 +1,162 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Informed360 • News</title>
-  <link rel="stylesheet" href="styles.css" />
+
+  <!-- System stack + Bahnschrift if available -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <div class="brand-title">INFORMED360</div>
-      <div class="brand-sub">News</div>
+  <!-- ====== HEADER ====== -->
+  <header class="gn-header">
+    <div class="gn-topbar">
+      <!-- 1) Word-logo (Bahnschrift look) -->
+      <a href="/" class="gn-logo" aria-label="Informed360">
+        INFORMED360 <span class="sub">News</span>
+      </a>
+
+      <!-- Search -->
+      <form id="searchForm" class="gn-search" role="search" aria-label="Search">
+        <span class="icon">🔎</span>
+        <input id="searchInput" type="search" placeholder="Search for topics, locations & sources" autocomplete="off" />
+        <button type="button" class="chevron" title="More">▾</button>
+      </form>
+
+      <!-- 2) Weather mini pill (moved up) -->
+      <div id="weatherMini" class="weather-mini" aria-live="polite" title="Current weather">—</div>
+
+      <!-- 3) Nation’s Mood • 4-hour Mini Trend -->
+      <div id="mood4hMini" class="mood-mini" aria-label="Nation’s Mood 4-hour trend" title="Nation’s Mood • every 4 hours">
+        <!-- SVG injected by app.js -->
+      </div>
+
+      <!-- Small action buttons / avatar -->
+      <div class="gn-actions">
+        <button class="icon-btn" title="Help">❓</button>
+        <button class="icon-btn" title="Settings">⚙️</button>
+        <button class="icon-btn" title="Apps">▦</button>
+        <button id="avatarBtn" class="avatar" title="Preferences">S</button>
+      </div>
     </div>
-    <div class="search">
-      <input type="search" placeholder="Search for topics, locations & sources">
-    </div>
-    <div class="actions">
-      <button class="icon-btn">?</button>
-      <button class="icon-btn">⚙️</button>
-      <div class="avatar">S</div>
-    </div>
+
+    <!-- category tabs (unchanged) -->
+    <nav class="gn-tabs">
+      <button class="tab active" data-cat="home">Home</button>
+      <button class="tab" data-cat="foryou">For you</button>
+      <button class="tab" data-cat="following">Following</button>
+      <button class="tab" data-cat="showcase">News Showcase</button>
+      <div class="tab-divider"></div>
+      <button class="tab" data-cat="india">India</button>
+      <button class="tab" data-cat="world">World</button>
+      <button class="tab" data-cat="local">Local</button>
+      <button class="tab" data-cat="business">Business</button>
+      <button class="tab" data-cat="technology">Technology</button>
+      <button class="tab" data-cat="entertainment">Entertainment</button>
+      <button class="tab" data-cat="sports">Sports</button>
+      <button class="tab" data-cat="science">Science</button>
+      <button class="tab" data-cat="health">Health</button>
+    </nav>
   </header>
 
-  <nav class="tabs">
-    <a class="tab active">Home</a>
-    <a class="tab">For you</a>
-    <a class="tab">Following</a>
-    <a class="tab">News Showcase</a>
-    <a class="tab">India</a><a class="tab">World</a><a class="tab">Local</a>
-    <a class="tab">Business</a><a class="tab">Technology</a><a class="tab">Entertainment</a>
-    <a class="tab">Sports</a><a class="tab">Science</a><a class="tab">Health</a>
-  </nav>
+  <!-- ====== “YOUR BRIEFING” STRIP ====== -->
+  <section class="gn-briefing">
+    <div class="briefing-left">
+      <h1 class="display-title">YOUR BRIEFING</h1>
+      <div id="briefingDate" class="briefing-date"></div>
+    </div>
 
-  <main class="container">
-    <h1 class="page-title">Your Briefing</h1>
+    <!-- Nation's Mood (daily ticker) + Markets -->
+    <div class="briefing-center">
+      <div id="moodTicker" class="ticker card" aria-live="polite">Nation’s Mood — Loading…</div>
+      <div id="marketTicker" class="ticker" aria-label="Market Ticker"></div>
+    </div>
 
-    <!-- Mood + Weather -->
-    <section class="row mood-weather">
-      <div class="pill" id="moodTicker">
-        Nation’s Mood — <span id="moodPos" class="mood positive">Positive 0%</span>
-        <span class="dot">·</span>
-        <span id="moodNeu" class="mood neutral">Neutral 0%</span>
-        <span class="dot">·</span>
-        <span id="moodNeg" class="mood negative">Negative 0%</span>
-      </div>
-      <div class="weather pill"><span>⛅</span><div><div class="w-title">Your area</div><div id="weatherTemp" class="w-temp">21°C</div></div></div>
-    </section>
+    <!-- (Previously large weather card – removed as per new layout) -->
+    <div></div>
+  </section>
 
-    <!-- 4-hour split bar -->
-    <section class="card mood-split">
-      <div class="card-head">
-        <h2>Nation’s Mood — 4-hour Trend</h2>
-        <div class="legend"><span class="legend-chip pos">Positive</span><span class="legend-chip neg">Negative</span></div>
-      </div>
-      <canvas id="moodTrend" height="90"></canvas>
-    </section>
-
-    <!-- Pinned | Hero | Trending -->
-    <section class="grid-briefing">
-      <div class="col">
-        <h3 class="col-title">Pinned</h3>
-        <div id="pinnedStack" class="stack"></div>
-      </div>
-
-      <div class="col hero">
-        <div id="heroCarousel" class="carousel"></div>
-        <div id="heroDots" class="dots"></div>
-      </div>
-
-      <div class="col">
-        <h3 class="col-title">Trending Topics</h3>
-        <div id="trendingList" class="stack"></div>
-      </div>
-    </section>
-
-    <!-- News + Leaderboard -->
-    <section class="grid-news">
-      <div class="news-feed">
-        <div class="chips">
-          <button class="chip active" data-filter="all">All</button>
-          <button class="chip" data-filter="positive">Positive</button>
-          <button class="chip" data-filter="neutral">Neutral</button>
-          <button class="chip" data-filter="negative">Negative</button>
+  <!-- ====== PAGE LAYOUT (unchanged blocks) ====== -->
+  <main class="layout">
+    <aside class="left">
+      <section class="block-card">
+        <div class="block-header">
+          <div class="block-title">PINNED</div>
         </div>
-        <div id="newsList" class="stack"></div>
-      </div>
-      <aside class="leaderboard card">
-        <h3 class="col-title">Sentiment Leaderboard</h3>
-        <div id="leaderboard" class="leaderboard-list"></div>
-      </aside>
+        <div id="pinned" class="block-list"></div>
+      </section>
+    </aside>
+
+    <section class="center">
+      <section id="hero" class="hero-carousel" aria-label="Top stories">
+        <button id="heroPrev" class="hero-nav prev" aria-label="Previous">‹</button>
+        <div id="heroTrack" class="hero-track"></div>
+        <button id="heroNext" class="hero-nav next" aria-label="Next">›</button>
+        <div id="heroDots" class="hero-dots" role="tablist" aria-label="Slides"></div>
+      </section>
+
+      <section class="news-section">
+        <div class="controls">
+          <button class="chip active" data-sent="all">All</button>
+          <button class="chip" data-sent="positive">Positive</button>
+          <button class="chip" data-sent="neutral">Neutral</button>
+          <button class="chip" data-sent="negative">Negative</button>
+          <button id="expChip" class="chip" title="Try experimental feeds">Max Feeds</button>
+        </div>
+        <div id="newsList" class="news-list"></div>
+      </section>
+
+      <!-- optional “daily” list (kept) -->
+      <section class="news-section">
+        <h3>More</h3>
+        <div id="daily" class="news-list"></div>
+      </section>
     </section>
+
+    <aside class="right">
+      <section class="block-card">
+        <div class="block-header">
+          <div class="block-title">TRENDING TOPICS</div>
+        </div>
+        <div id="topicsList" class="topics-list"></div>
+      </section>
+
+      <section class="block-card">
+        <div class="block-header">
+          <div class="block-title">SENTIMENT LEADERBOARD</div>
+        </div>
+        <div class="card-list" id="leaderboard">
+          <!-- existing leader UI keeps working -->
+        </div>
+      </section>
+    </aside>
   </main>
 
-  <script type="module" src="app.js"></script>
+  <footer class="footer">
+    © <span id="year"></span> Informed360
+  </footer>
+
+  <!-- Preferences modal (unchanged minimal) -->
+  <dialog id="signinModal">
+    <form method="dialog">
+      <h3>Personalize</h3>
+      <label>Name <input id="prefName" type="text"></label>
+      <label>City <input id="prefCity" type="text" placeholder="Bengaluru"></label>
+      <fieldset>
+        <legend>Interests</legend>
+        <label><input type="checkbox" value="india" checked> India</label>
+        <label><input type="checkbox" value="business"> Business</label>
+        <label><input type="checkbox" value="technology"> Tech</label>
+      </fieldset>
+      <div style="display:flex; gap:.5rem; justify-content:flex-end">
+        <button value="cancel">Cancel</button>
+        <button id="savePrefs" value="default">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/app.js" type="module"></script>
 </body>
 </html>
