@@ -101,7 +101,7 @@
             <span class="lg neg">Negative</span>
           </div>
         </div>
-        <svg id="moodSpark" class="mood-spark" viewBox="0 0 280 70" role="img" aria-label="4 hour mood trend"></svg>
+        <svg id="moodSpark" class="mood-spark" viewBox="0 0 300 120" role="img" aria-label="4 hour mood trend"></svg>
         <div id="moodSummary" class="mood-summary"></div>
       </div>
 
@@ -118,7 +118,13 @@
           <div class="leader-sub">(Updated every hour)</div>
         </div>
         <div id="leaderboard" class="leader-grid" aria-live="polite">
-          <!-- populated by app.js -->
+          <div class="leader-col col-pos"></div>
+          <div class="leader-col col-neu"></div>
+          <div class="leader-col col-neg"></div>
+          <div class="leader-lines"></div>
+          <div class="leader-ylabels">
+            <span>75%</span><span>50%</span><span>25%</span>
+          </div>
         </div>
         <div class="leader-foot">
           <span>Positive</span><span>Neutral</span><span>Negative</span>
