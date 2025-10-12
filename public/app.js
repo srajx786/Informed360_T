@@ -4,10 +4,30 @@ const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const fmtPct = (n) => `${Math.max(0, Math.min(100, Math.round(n)))}%`;
 async function fetchJSON(u){ const r = await fetch(u); if(!r.ok) throw new Error(await r.text()); return r.json(); }
 const domainFromUrl = (u="") => { try { return new URL(u).hostname.replace(/^www\./,""); } catch { return ""; } };
-const logoFor = (link="", source="") => {
-  const d = domainFromUrl(link) || domainFromUrl(source) || "";
-  return d ? `https://logo.clearbit.com/${d}` : "";
+
+/* Canonical domains for clean logos */
+const LOGO_DOMAIN_MAP = {
+  "India Today":"indiatoday.in",
+  "The Hindu":"thehindu.com",
+  "Scroll.in":"scroll.in", "Scroll":"scroll.in",
+  "News18":"news18.com", "NEWS18":"news18.com",
+  "Deccan Herald":"deccanherald.com", "DH":"deccanherald.com",
+  "ThePrint":"theprint.in", "Mint":"livemint.com",
+  "Hindustan Times":"hindustantimes.com",
+  "Times of India":"timesofindia.indiatimes.com", "TOI":"timesofindia.indiatimes.com",
+  "Indian Express":"indianexpress.com", "The Indian Express":"indianexpress.com",
+  "NDTV":"ndtv.com", "Firstpost":"firstpost.com",
+  "Reuters":"reuters.com", "Business Standard":"business-standard.com",
+  "Indiatimes":"indiatimes.com", "The Economic Times":"economictimes.indiatimes.com"
 };
+
+const clearbit = (d)=> d ? `https://logo.clearbit.com/${d}` : "";
+const logoFor = (link="", source="") => {
+  const mapDom = LOGO_DOMAIN_MAP[source?.trim()] || "";
+  const d = mapDom || domainFromUrl(link) || "";
+  return clearbit(d);
+};
+
 const PLACEHOLDER = "data:image/svg+xml;base64," + btoa(`<svg xmlns='http://www.w3.org/2000/svg' width='400' height='260'><rect width='100%' height='100%' fill='#e5edf7'/><text x='50%' y='52%' text-anchor='middle' font-family='sans-serif' font-weight='700' fill='#8aa3c4' font-size='18'>Image</text></svg>`);
 
 /* sentiment meter */
@@ -120,7 +140,7 @@ async function loadAll(){
   renderAll();
 }
 
-/* renderers */
+/* ===== cards & lists ===== */
 function safeImgTag(src, link, source, cls){
   const fallback = logoFor(link, source) || PLACEHOLDER;
   const s = src || fallback || PLACEHOLDER;
@@ -194,43 +214,56 @@ function renderTopics(){
   }).join("");
 }
 
-/* ===== 4-hour mood microchart (SVG lines) ===== */
+/* ===== 4-hour mood microchart (exact styling) ===== */
 function renderMood4h(){
   const now = Date.now();
   const fourHrs = 4*60*60*1000;
   const recent = state.articles.filter(a => now - new Date(a.publishedAt).getTime() <= fourHrs);
-  const buckets = [0,1,2,3].map(h=>({pos:0,neg:0,neu:0,count:0}));
+
+  // bucket by each hour (oldest -> newest)
+  const hoursBack = [3,2,1,0];
+  const buckets = hoursBack.map(()=>({pos:0,neg:0,neu:0,c:0}));
   recent.forEach(a=>{
     const dt = now - new Date(a.publishedAt).getTime();
-    const i = Math.min(3, Math.floor(dt/(60*60*1000)));
-    buckets[3-i].pos += a.sentiment.posP; // older->left
-    buckets[3-i].neg += a.sentiment.negP;
-    buckets[3-i].neu += a.sentiment.neuP;
-    buckets[3-i].count++;
+    const idx = Math.min(3, Math.floor(dt/(60*60*1000))); // 0..3 from newest
+    const bi = 3-idx; // oldest on left
+    buckets[bi].pos += a.sentiment.posP; buckets[bi].neg += a.sentiment.negP; buckets[bi].neu += a.sentiment.neuP; buckets[bi].c++;
   });
   const pts = buckets.map(b=>{
-    const n = Math.max(1,b.count);
+    const n = Math.max(1,b.c);
     return { pos:Math.round(b.pos/n), neg:Math.round(b.neg/n), neu:Math.round(b.neu/n) };
   });
-  const svg = $("#moodSpark");
-  const W = 280, H = 70, pad=6;
-  const x = (i)=> pad + i*( (W-2*pad)/3 );
-  const y = (p)=> H - pad - (p/100)*(H-2*pad);
 
-  const mkPath = (key)=> pts.map((p,i)=> `${i===0?"M":"L"} ${x(i)} ${y(p[key])}`).join(" ");
+  const svg = $("#moodSpark");
+  const W = 300, H = 120;
+  const padL=34, padR=10, padT=10, padB=16;
+  const mid = (H-padB+padT)/2 + 2;
+
+  const x = (i)=> padL + i*((W-padL-padR)/(pts.length-1 || 1));
+  const yTop = (p)=> mid - (p/100)*( (H/2) - padT );
+  const yBot = (p)=> mid + (p/100)*( (H/2) - padB );
+
+  // time labels for the last 4 ticks
+  const tickLabels = hoursBack.map(h=>{
+    const d = new Date(now - h*60*60*1000);
+    return d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+  });
+
+  // build grid (dashed verticals and mid grey band)
+  const gridLines = hoursBack.map((_,i)=> `<line x1="${x(i)}" y1="${padT}" x2="${x(i)}" y2="${H-padB}" stroke="#9aa4ad" stroke-dasharray="4 4" stroke-width="1" opacity=".6"/>`).join("");
+  const labels = hoursBack.map((_,i)=> `<text x="${x(i)}" y="${H-2}" text-anchor="middle" font-size="10" fill="#6b7280">${tickLabels[i]}</text>`).join("");
+
+  const pPath = pts.map((p,i)=> `${i?'L':'M'} ${x(i)} ${yTop(p.pos)}`).join(" ");
+  const nPath = pts.map((p,i)=> `${i?'L':'M'} ${x(i)} ${yBot(p.neg)}`).join(" ");
+  const pDots = pts.map((p,i)=> `<circle cx="${x(i)}" cy="${yTop(p.pos)}" r="2.5" fill="#22c55e"/><text x="${x(i)}" y="${yTop(p.pos)-6}" text-anchor="middle" font-size="10" fill="#22c55e">${p.pos}%</text>`).join("");
+  const nDots = pts.map((p,i)=> `<circle cx="${x(i)}" cy="${yBot(p.neg)}" r="2.5" fill="#ef4444"/><text x="${x(i)}" y="${yBot(p.neg)+12}" text-anchor="middle" font-size="10" fill="#ef4444">${p.neg}%</text>`).join("");
+
   svg.innerHTML = `
-    <defs>
-      <linearGradient id="gpos" x1="0" x2="0" y1="0" y2="1">
-        <stop offset="0" stop-color="#22c55e" stop-opacity=".9"/>
-        <stop offset="1" stop-color="#22c55e" stop-opacity=".2"/>
-      </linearGradient>
-      <linearGradient id="gneg" x1="0" x2="0" y1="0" y2="1">
-        <stop offset="0" stop-color="#ef4444" stop-opacity=".9"/>
-        <stop offset="1" stop-color="#ef4444" stop-opacity=".2"/>
-      </linearGradient>
-    </defs>
-    <path d="${mkPath("pos")}" fill="none" stroke="url(#gpos)" stroke-width="2.2" />
-    <path d="${mkPath("neg")}" fill="none" stroke="url(#gneg)" stroke-width="2.2" />
+    <rect x="0" y="${mid-10}" width="${W}" height="20" fill="#e5e7eb" opacity=".9"></rect>
+    ${gridLines}
+    <path d="${pPath}" fill="none" stroke="#22c55e" stroke-width="2.2" />
+    <path d="${nPath}" fill="none" stroke="#ef4444" stroke-width="2.2" />
+    ${pDots}${nDots}${labels}
   `;
 
   const avg = pts.reduce((a,p)=>({pos:a.pos+p.pos, neu:a.neu+p.neu, neg:a.neg+p.neg}),{pos:0,neu:0,neg:0});
@@ -238,16 +271,16 @@ function renderMood4h(){
   $("#moodSummary").textContent = `Positive ${fmtPct(avg.pos/n)} · Neutral ${fmtPct(avg.neu/n)} · Negative ${fmtPct(avg.neg/n)}`;
 }
 
-/* ===== Sentiment Leaderboard (per-source bias) ===== */
+/* ===== Sentiment Leaderboard (exact style) ===== */
 function computeLeaderboard(){
   const bySource = new Map();
   state.articles.forEach(a=>{
-    const s = bySource.get(a.source) || {n:0,pos:0,neg:0,neu:0,compound:0,link:a.link};
+    const key = a.source?.trim();
+    if(!key) return;
+    const s = bySource.get(key) || {n:0,pos:0,neg:0,neu:0,link:a.link};
     s.n++; s.pos+=a.sentiment.posP; s.neg+=a.sentiment.negP; s.neu+=a.sentiment.neuP;
-    // approximate compound from buckets
-    s.compound += (a.sentiment.posP - a.sentiment.negP);
     s.link = a.link || s.link;
-    bySource.set(a.source, s);
+    bySource.set(key, s);
   });
 
   const arr = [...bySource.entries()].map(([src,v])=>{
@@ -255,47 +288,41 @@ function computeLeaderboard(){
     const pos = v.pos/n, neg = v.neg/n, neu = v.neu/n;
     const bias = (pos - neg); // >0 positive, <0 negative
     return { source:src, pos, neg, neu, bias, logo:logoFor(v.link, src) };
-  }).filter(x=>x.source && isFinite(x.bias) && (x.pos+x.neg+x.neu)>0.1);
+  }).filter(x=> (x.pos+x.neg+x.neu)>0.1);
 
   const topPos = arr.filter(x=>x.bias>5).sort((a,b)=>b.bias-a.bias).slice(0,2);
-  const topNeu = arr.sort((a,b)=>(Math.abs(a.bias)-Math.abs(b.bias))).slice(0,2);
   const topNeg = arr.filter(x=>x.bias<-5).sort((a,b)=>a.bias-b.bias).slice(0,2);
+  const topNeu = arr.slice().sort((a,b)=> Math.abs(a.bias)-Math.abs(b.bias) ).slice(0,2);
 
   return { pos:topPos, neu:topNeu, neg:topNeg };
 }
 
 function renderLeaderboard(){
   const grid = $("#leaderboard");
-  grid.innerHTML = `
-    <div class="leader-col" id="col-pos"></div>
-    <div class="leader-col" id="col-neu"></div>
-    <div class="leader-col" id="col-neg"></div>
-  `;
-
-  const place = (colId, list) => {
-    const col = $(colId);
-    if (!col) return;
-    const levels = [0.25, 0.55, 0.80]; // y positions candidates
-    list.forEach((s, idx)=>{
-      const y = 100 - Math.min(95, Math.max(5, ( (idx===0?0.75:0.45) * 100 )));
-      const x = 50 + (idx===0 ? 0 : 22) * (idx%2===0? -1 : 1);
-      const top = (220*(1-levels[idx%levels.length]));
-      const left = (col.getBoundingClientRect?.().width||100) * (idx===0?0.5:(idx%2?0.7:0.3));
-      const badge = document.createElement("div");
-      badge.className = "badge";
-      badge.style.top = `${top}px`;
-      badge.style.left = `${left}px`;
-      badge.innerHTML = s.logo
-        ? `<img src="${s.logo}" alt="${s.source}" onerror="this.onerror=null;this.src='${PLACEHOLDER}'">`
-        : `<span style="font-weight:800;font-size:.8rem">${s.source}</span>`;
-      col.appendChild(badge);
-    });
-  };
+  const colPos = grid.querySelector(".col-pos");
+  const colNeu = grid.querySelector(".col-neu");
+  const colNeg = grid.querySelector(".col-neg");
+  [colPos,colNeu,colNeg].forEach(c=> c.innerHTML="");
 
   const {pos, neu, neg} = computeLeaderboard();
-  place("#col-pos", pos);
-  place("#col-neu", neu);
-  place("#col-neg", neg);
+
+  // helper to drop badges at nice vertical slots (75/50/25%)
+  const slots = [0.25, 0.55, 0.80]; // fraction from top to bottom area
+  function place(col, list){
+    list.forEach((s, idx)=>{
+      const b = document.createElement("div");
+      b.className = "badge";
+      b.style.left = (col.offsetWidth ? col.offsetWidth/2 : 110) + "px";
+      b.style.top = (col.offsetHeight ? col.offsetHeight*slots[idx%slots.length] : 140) + "px";
+      const logo = s.logo || PLACEHOLDER;
+      b.innerHTML = `<img src="${logo}" alt="${s.source}" onerror="this.onerror=null;this.src='${PLACEHOLDER}'">`;
+      col.appendChild(b);
+    });
+  }
+
+  place(colPos, pos);
+  place(colNeu, neu);
+  place(colNeg, neg);
 
   state.lastLeaderboardAt = Date.now();
 }
@@ -363,6 +390,6 @@ startHeroAuto();
 /* refreshes */
 setInterval(loadAll, 1000*60*5);       // content every 5 min
 setInterval(loadMarkets, 1000*60*5);   // markets every 5 min
-setInterval(()=>{                      // leaderboard at least hourly as requested
+setInterval(()=>{                      // leaderboard refresh check (hourly)
   if (Date.now() - state.lastLeaderboardAt > 1000*60*60) renderLeaderboard();
 }, 15*1000);
