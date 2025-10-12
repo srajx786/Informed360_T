@@ -3,6 +3,12 @@ const $ = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const fmtPct = (n) => `${Math.max(0, Math.min(100, Math.round(n)))}%`;
 async function fetchJSON(u){ const r = await fetch(u); if(!r.ok) throw new Error(await r.text()); return r.json(); }
+const domainFromUrl = (u="") => { try { return new URL(u).hostname.replace(/^www\./,""); } catch { return ""; } };
+const logoFor = (link="", source="") => {
+  const d = domainFromUrl(link) || domainFromUrl(source) || "";
+  return d ? `https://logo.clearbit.com/${d}` : "";
+};
+const PLACEHOLDER = "data:image/svg+xml;base64," + btoa(`<svg xmlns='http://www.w3.org/2000/svg' width='400' height='260'><rect width='100%' height='100%' fill='#e5edf7'/><text x='50%' y='52%' text-anchor='middle' font-family='sans-serif' font-weight='700' fill='#8aa3c4' font-size='18'>Image</text></svg>`);
 
 /* sentiment meter */
 function renderSentiment(s, slim=false){
@@ -37,17 +43,14 @@ const state = {
   profile: loadProfile(),
   theme: localStorage.getItem("theme") || "light",
   hero: { index:0, timer:null, pause:false },
-  mood4h: null
+  lastLeaderboardAt: 0
 };
-
 function loadProfile(){ try { return JSON.parse(localStorage.getItem("i360_profile") || "{}"); } catch { return {}; } }
 function saveProfile(p){ localStorage.setItem("i360_profile", JSON.stringify(p || {})); state.profile = p || {}; }
 function applyTheme(){ document.documentElement.setAttribute("data-theme", state.theme); }
 
-/* date */
+/* date + weather */
 const todayStr = ()=> new Date().toLocaleDateString(undefined,{weekday:"long", day:"numeric", month:"long"});
-
-/* weather (mini) */
 async function getWeather(){
   try{
     const coords = await new Promise((res)=>{
@@ -67,9 +70,9 @@ async function getWeather(){
     }
     const t = Math.round(wx?.current?.temperature_2m ?? 0);
     const code = wx?.current?.weather_code ?? 0;
-    const icon = code>=0 && code<3 ? "☀️" : (code<50 ? "⛅" : "🌧️");
-    $("#weatherMini").innerHTML = `<div class="wx-icon">${icon}</div><div><div class="wx-city">${city}</div><div class="wx-temp">${t}°C</div></div>`;
-  }catch{ $("#weatherMini").textContent = "Weather —"; }
+    const icon = code>=0 && code<3 ? "🌙" : (code<50 ? "⛅" : "🌧️");
+    $("#weatherCard").innerHTML = `<div class="wx-icon">${icon}</div><div><div class="wx-city">${city}</div><div class="wx-temp">${t}°C</div></div>`;
+  }catch{ $("#weatherCard").textContent = "Weather unavailable"; }
 }
 
 /* markets */
@@ -90,102 +93,7 @@ async function loadMarkets(){
   }catch{ $("#marketTicker").innerHTML = ""; }
 }
 
-/* ========= Nation's Mood calculations ========= */
-
-/** Aggregate nation mood from the day’s articles */
-function calcNationMoodFromArticles(list){
-  let pos = 0, neu = 0, neg = 0, t = 0;
-  for(const a of list){
-    const s = a?.sentiment || {};
-    const pp = +s.posP || +s.pos || 0;
-    const np = +s.neuP || +s.neu || 0;
-    const gp = +s.negP || +s.neg || 0;
-    if(pp+np+gp > 0){ pos += pp; neu += np; neg += gp; t += 100; }
-  }
-  if(t===0) return {posP:0, neuP:100, negP:0};
-  return {posP:(pos/t)*100, neuP:(neu/t)*100, negP:(neg/t)*100};
-}
-
-/** Build 4-hour bins for today: 00,04,08,12,16,20,24 */
-function build4hBins(list){
-  const now = new Date();
-  const start = new Date(now); start.setHours(0,0,0,0);
-  const bins = [0,4,8,12,16,20,24].map(h=>({h, pos:0, neg:0, cnt:0}));
-
-  for(const a of list){
-    const ts = new Date(a.publishedAt || a.pubDate || Date.now());
-    if (ts < start) continue;
-    const hr = ts.getHours();
-    const idx = hr<4?0 : hr<8?1 : hr<12?2 : hr<16?3 : hr<20?4 : hr<24?5 : 6;
-    const s = a.sentiment || {};
-    const p = +s.posP || +s.pos || 0;
-    const n = +s.negP || +s.neg || 0;
-    if (p+n>0){ bins[idx].pos += p; bins[idx].neg += n; bins[idx].cnt++; }
-  }
-
-  return bins.map(b=>{
-    const posP = b.cnt ? (b.pos/(b.cnt*100))*100 : 0;
-    const negP = b.cnt ? (b.neg/(b.cnt*100))*100 : 0;
-    return { hour:b.h, posP, negP };
-  });
-}
-
-/* Render mood ticker text (daily aggregate above markets) */
-function renderMoodTicker(agg){
-  const txt = `
-    Nation’s Mood — 
-    <span style="color:var(--pos);font-weight:800">Positive ${fmtPct(agg.posP)}</span> ·
-    <span style="color:var(--neu);font-weight:800">Neutral ${fmtPct(agg.neuP)}</span> ·
-    <span style="color:var(--neg);font-weight:800">Negative ${fmtPct(agg.negP)}</span>
-  `;
-  $("#moodTicker").innerHTML = txt;
-}
-
-/* Render compact 4-hour mini chart (SVG) — labels only up to current slot */
-function renderMood4hMini(bins){
-  const now = new Date();
-  const upTo = Math.min(6, Math.floor(now.getHours()/4)); // 0..6 index for current 4h slot
-  const used = bins.slice(0, upTo + 1); // values to plot/label
-
-  const W = 220, H = 78, PAD = 6;
-  const plotW = W - PAD*2, plotH = H - PAD*2;
-
-  // map % to y (0 top). Positive: higher when value increases.
-  const yPos = v => PAD + (plotH/2 - 8) * (1 - Math.min(1, Math.max(0, v/100)));
-  // Negative line goes up when negativity improves => plot (100 - neg%)
-  const yNeg = v => PAD + plotH - (plotH/2 - 8) * (1 - Math.min(1, Math.max(0, (100 - v)/100)));
-
-  const slotX = i => PAD + (plotW/6) * i; // 7 slots across (0..6)
-
-  const posPts = used.map((d,i)=>`${slotX(i)},${yPos(d.posP)}`).join(' ');
-  const negPts = used.map((d,i)=>`${slotX(i)},${yNeg(d.negP)}`).join(' ');
-
-  const hours = ["00:00","04:00","08:00","12:00","16:00","20:00","24:00"];
-
-  const svg = `
-  <svg class="mini-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Nation’s Mood 4-hour trend">
-    <!-- mid grey band -->
-    <rect x="${PAD}" y="${H/2-10}" width="${plotW}" height="20" class="mini-baseline" />
-    <!-- vertical hour guides (always visible) -->
-    ${[0,1,2,3,4,5,6].map(i => `<line x1="${slotX(i)}" y1="${PAD}" x2="${slotX(i)}" y2="${H-PAD}" class="mini-axis"/>`).join('')}
-    <!-- green positive and red inverse-negative lines (only to current slot) -->
-    ${used.length>1 ? `<polyline class="mini-pos" points="${posPts}"/>` : ''}
-    ${used.length>1 ? `<polyline class="mini-neg" points="${negPts}"/>` : ''}
-
-    <!-- hour labels ONLY up to the current slot -->
-    ${[...Array(upTo+1).keys()].map(i => `
-      <text class="mini-label" x="${slotX(i)-12}" y="${H/2+15}">${hours[i].slice(0,5)}</text>
-    `).join('')}
-
-    <!-- % labels ONLY for rendered points -->
-    ${used.map((d,i)=> `<text class="mini-pct-pos" x="${slotX(i)-8}" y="${yPos(d.posP)-4}">${Math.round(d.posP)}%</text>`).join('')}
-    ${used.map((d,i)=> `<text class="mini-pct-neg" x="${slotX(i)-8}" y="${yNeg(d.negP)+12}">${Math.round(d.negP)}%</text>`).join('')}
-  </svg>`;
-
-  $("#mood4hMini").innerHTML = svg;
-}
-
-/* ===== loads ===== */
+/* loads */
 async function loadAll(){
   const qs = new URLSearchParams();
   if (state.filter !== "all") qs.set("sentiment", state.filter);
@@ -201,25 +109,28 @@ async function loadAll(){
   state.topics = (topics.topics || []).slice(0, 8);
   state.pins = state.articles.slice(0,3);
 
-  // Mood computations
-  try {
-    const m4 = await fetchJSON("/api/mood4h");     // if backend provides bins, prefer them
-    state.mood4h = m4?.bins || build4hBins(state.articles);
-  } catch {
-    state.mood4h = build4hBins(state.articles);   // client-side fallback
+  if (state.category === "local" && state.profile?.city) {
+    const c = state.profile.city.toLowerCase();
+    state.articles = state.articles.filter(a => (a.title||"").toLowerCase().includes(c) || (a.link||"").toLowerCase().includes(c));
+  } else if (state.category === "foryou" && Array.isArray(state.profile?.interests) && state.profile.interests.length) {
+    const wanted = new Set(state.profile.interests);
+    state.articles = state.articles.filter(a => wanted.has(a.category));
   }
-  const dailyAgg = calcNationMoodFromArticles(state.articles);
-  renderMoodTicker(dailyAgg);
-  renderMood4hMini(state.mood4h);
 
   renderAll();
 }
 
-/* renderers (news UI kept intact) */
+/* renderers */
+function safeImgTag(src, link, source, cls){
+  const fallback = logoFor(link, source) || PLACEHOLDER;
+  const s = src || fallback || PLACEHOLDER;
+  return `<img class="${cls}" src="${s}" onerror="this.onerror=null;this.src='${fallback || PLACEHOLDER}'" alt="">`;
+}
+
 function card(a){
   return `
     <a class="news-item" href="${a.link}" target="_blank" rel="noopener">
-      <img class="thumb" src="${a.image}" alt="">
+      ${safeImgTag(a.image, a.link, a.source, "thumb")}
       <div>
         <div class="title">${a.title}</div>
         <div class="meta"><span class="source">${a.source}</span> · <span>${new Date(a.publishedAt).toLocaleString()}</span></div>
@@ -227,6 +138,8 @@ function card(a){
       </div>
     </a>`;
 }
+
+/* Pinned */
 function renderPinned(){
   $("#pinned").innerHTML = state.pins.map(a => `
     <div class="row">
@@ -235,16 +148,19 @@ function renderPinned(){
       ${renderSentiment(a.sentiment, true)}
     </div>`).join("");
 }
+
+/* News + Daily */
 function renderNews(){ $("#newsList").innerHTML = state.articles.slice(4, 12).map(card).join(""); }
 function renderDaily(){ $("#daily").innerHTML = state.articles.slice(12, 20).map(card).join(""); }
 
+/* HERO */
 function renderHero(){
   const slides = state.articles.slice(0,4);
   const track = $("#heroTrack"); const dots = $("#heroDots");
   if (!slides.length){ track.innerHTML=""; dots.innerHTML=""; return; }
   track.innerHTML = slides.map(a => `
     <article class="hero-slide">
-      <div class="hero-img"><img src="${a.image}" alt=""></div>
+      <div class="hero-img">${safeImgTag(a.image, a.link, a.source, "")}</div>
       <div class="hero-content">
         <h3>${a.title}</h3>
         <a href="${a.link}" target="_blank" class="analysis-link" rel="noopener">Read Analysis</a>
@@ -261,6 +177,8 @@ function updateHero(i){
   $("#heroTrack").style.transform = `translateX(-${state.hero.index*100}%)`;
   $$("#heroDots button").forEach((b,bi)=> b.classList.toggle("active", bi===state.hero.index));
 }
+function startHeroAuto(){ stopHeroAuto(); state.hero.timer = setInterval(()=>{ if(!state.hero.pause) updateHero(state.hero.index+1); }, 6000); }
+function stopHeroAuto(){ if(state.hero.timer) clearInterval(state.hero.timer); state.hero.timer=null; }
 
 /* Trending topics */
 function renderTopics(){
@@ -276,10 +194,117 @@ function renderTopics(){
   }).join("");
 }
 
+/* ===== 4-hour mood microchart (SVG lines) ===== */
+function renderMood4h(){
+  const now = Date.now();
+  const fourHrs = 4*60*60*1000;
+  const recent = state.articles.filter(a => now - new Date(a.publishedAt).getTime() <= fourHrs);
+  const buckets = [0,1,2,3].map(h=>({pos:0,neg:0,neu:0,count:0}));
+  recent.forEach(a=>{
+    const dt = now - new Date(a.publishedAt).getTime();
+    const i = Math.min(3, Math.floor(dt/(60*60*1000)));
+    buckets[3-i].pos += a.sentiment.posP; // older->left
+    buckets[3-i].neg += a.sentiment.negP;
+    buckets[3-i].neu += a.sentiment.neuP;
+    buckets[3-i].count++;
+  });
+  const pts = buckets.map(b=>{
+    const n = Math.max(1,b.count);
+    return { pos:Math.round(b.pos/n), neg:Math.round(b.neg/n), neu:Math.round(b.neu/n) };
+  });
+  const svg = $("#moodSpark");
+  const W = 280, H = 70, pad=6;
+  const x = (i)=> pad + i*( (W-2*pad)/3 );
+  const y = (p)=> H - pad - (p/100)*(H-2*pad);
+
+  const mkPath = (key)=> pts.map((p,i)=> `${i===0?"M":"L"} ${x(i)} ${y(p[key])}`).join(" ");
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="gpos" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0" stop-color="#22c55e" stop-opacity=".9"/>
+        <stop offset="1" stop-color="#22c55e" stop-opacity=".2"/>
+      </linearGradient>
+      <linearGradient id="gneg" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0" stop-color="#ef4444" stop-opacity=".9"/>
+        <stop offset="1" stop-color="#ef4444" stop-opacity=".2"/>
+      </linearGradient>
+    </defs>
+    <path d="${mkPath("pos")}" fill="none" stroke="url(#gpos)" stroke-width="2.2" />
+    <path d="${mkPath("neg")}" fill="none" stroke="url(#gneg)" stroke-width="2.2" />
+  `;
+
+  const avg = pts.reduce((a,p)=>({pos:a.pos+p.pos, neu:a.neu+p.neu, neg:a.neg+p.neg}),{pos:0,neu:0,neg:0});
+  const n=pts.length||1;
+  $("#moodSummary").textContent = `Positive ${fmtPct(avg.pos/n)} · Neutral ${fmtPct(avg.neu/n)} · Negative ${fmtPct(avg.neg/n)}`;
+}
+
+/* ===== Sentiment Leaderboard (per-source bias) ===== */
+function computeLeaderboard(){
+  const bySource = new Map();
+  state.articles.forEach(a=>{
+    const s = bySource.get(a.source) || {n:0,pos:0,neg:0,neu:0,compound:0,link:a.link};
+    s.n++; s.pos+=a.sentiment.posP; s.neg+=a.sentiment.negP; s.neu+=a.sentiment.neuP;
+    // approximate compound from buckets
+    s.compound += (a.sentiment.posP - a.sentiment.negP);
+    s.link = a.link || s.link;
+    bySource.set(a.source, s);
+  });
+
+  const arr = [...bySource.entries()].map(([src,v])=>{
+    const n = Math.max(1,v.n);
+    const pos = v.pos/n, neg = v.neg/n, neu = v.neu/n;
+    const bias = (pos - neg); // >0 positive, <0 negative
+    return { source:src, pos, neg, neu, bias, logo:logoFor(v.link, src) };
+  }).filter(x=>x.source && isFinite(x.bias) && (x.pos+x.neg+x.neu)>0.1);
+
+  const topPos = arr.filter(x=>x.bias>5).sort((a,b)=>b.bias-a.bias).slice(0,2);
+  const topNeu = arr.sort((a,b)=>(Math.abs(a.bias)-Math.abs(b.bias))).slice(0,2);
+  const topNeg = arr.filter(x=>x.bias<-5).sort((a,b)=>a.bias-b.bias).slice(0,2);
+
+  return { pos:topPos, neu:topNeu, neg:topNeg };
+}
+
+function renderLeaderboard(){
+  const grid = $("#leaderboard");
+  grid.innerHTML = `
+    <div class="leader-col" id="col-pos"></div>
+    <div class="leader-col" id="col-neu"></div>
+    <div class="leader-col" id="col-neg"></div>
+  `;
+
+  const place = (colId, list) => {
+    const col = $(colId);
+    if (!col) return;
+    const levels = [0.25, 0.55, 0.80]; // y positions candidates
+    list.forEach((s, idx)=>{
+      const y = 100 - Math.min(95, Math.max(5, ( (idx===0?0.75:0.45) * 100 )));
+      const x = 50 + (idx===0 ? 0 : 22) * (idx%2===0? -1 : 1);
+      const top = (220*(1-levels[idx%levels.length]));
+      const left = (col.getBoundingClientRect?.().width||100) * (idx===0?0.5:(idx%2?0.7:0.3));
+      const badge = document.createElement("div");
+      badge.className = "badge";
+      badge.style.top = `${top}px`;
+      badge.style.left = `${left}px`;
+      badge.innerHTML = s.logo
+        ? `<img src="${s.logo}" alt="${s.source}" onerror="this.onerror=null;this.src='${PLACEHOLDER}'">`
+        : `<span style="font-weight:800;font-size:.8rem">${s.source}</span>`;
+      col.appendChild(badge);
+    });
+  };
+
+  const {pos, neu, neg} = computeLeaderboard();
+  place("#col-pos", pos);
+  place("#col-neu", neu);
+  place("#col-neg", neg);
+
+  state.lastLeaderboardAt = Date.now();
+}
+
 /* glue */
 function renderAll(){
   $("#briefingDate").textContent = todayStr();
   renderHero(); renderPinned(); renderNews(); renderDaily(); renderTopics();
+  renderMood4h(); renderLeaderboard();
   $("#year").textContent = new Date().getFullYear();
 }
 
@@ -333,6 +358,11 @@ $("#briefingDate").textContent = todayStr();
 getWeather();
 loadMarkets();
 loadAll();
-setInterval(loadAll, 1000*60*5);     // refresh news/mood every 5 min
-setInterval(loadMarkets, 1000*60*5); // refresh markets
-setInterval(getWeather, 1000*60*10); // weather
+startHeroAuto();
+
+/* refreshes */
+setInterval(loadAll, 1000*60*5);       // content every 5 min
+setInterval(loadMarkets, 1000*60*5);   // markets every 5 min
+setInterval(()=>{                      // leaderboard at least hourly as requested
+  if (Date.now() - state.lastLeaderboardAt > 1000*60*60) renderLeaderboard();
+}, 15*1000);
